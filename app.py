@@ -62,9 +62,8 @@ def init_system():
             "1일차_1차시": [{"id": "q1", "label": "탐구 주제 및 목차 설계 (텍스트, 파일, 링크 중 자유 제출)"}],
             "2일차_1차시": [{"id": "q1", "label": "보고서 초안 제출"}]
         },
-        "materials": [] # 교사용 강의 자료(PPT, 링크 등) 저장 공간 추가
+        "materials": [] # 교사용 강의 자료(PPT, 링크 등) 저장 공간
     }
-    # 기존 config에 materials 항목이 없으면 추가 보정
     current_config = load_json(CONFIG_FILE, default_config)
     if "materials" not in current_config:
         current_config["materials"] = []
@@ -111,8 +110,8 @@ def render_submission_form(username, category, q_id, q_label):
             save_json(DATA_FILE, data)
             st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
 
-# --- 캠프 종합 공지 렌더링 ---
-def render_camp_overview():
+# --- 캠프 종합 공지 렌더링 (권한별 다운로드 제한 포함) ---
+def render_camp_overview(current_role):
     st.header("🎯 [학생-호계고-거점학교] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
     
@@ -132,7 +131,7 @@ def render_camp_overview():
     st.dataframe(pd.DataFrame(schedule_data, columns=["일자", "차시(시간)", "수업내용", "활동내용"]), use_container_width=True, hide_index=True)
     st.markdown("---")
     
-    # [추가됨] 강사용 PPT 및 링크 자료실 표시 영역
+    # 강사용 PPT 및 링크 자료실 표시 영역 (학생 다운로드 제한 처리)
     app_config = load_json(CONFIG_FILE, {})
     materials = app_config.get("materials", [])
     if materials:
@@ -142,8 +141,11 @@ def render_camp_overview():
                 st.markdown(f"🔗 **[{mat['title']}]({mat['content']})**")
             elif mat["type"] == "file":
                 if os.path.exists(mat["content"]):
-                    with open(mat["content"], "rb") as f:
-                        st.download_button(f"📥 {mat['title']} ({mat['filename']}) 다운로드", f, file_name=mat['filename'], key=f"mat_dl_{mat['id']}")
+                    if current_role in ["관리자", "교사"]:
+                        with open(mat["content"], "rb") as f:
+                            st.download_button(f"📥 {mat['title']} ({mat['filename']}) 다운로드", f, file_name=mat['filename'], key=f"mat_dl_{mat['id']}")
+                    else:
+                        st.markdown(f"🔒 **{mat['title']}** (학생 다운로드 제한 자료)")
         st.markdown("---")
 
     col1, col2 = st.columns(2)
@@ -174,10 +176,8 @@ def render_camp_overview():
         with st.expander("📁 차시별 강의 pdf"):
             st.markdown("[🔗 차시별 강의 PDF 드라이브 모음 열기](#)")
 
-        # [요구사항 반영] QR 코드 이미지 삽입
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
             st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
-            # 이미지 파일명 verbatim 렌더링 처리
             qr_image = "image_e1cca7.png"
             if os.path.exists(qr_image):
                 st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
@@ -206,14 +206,23 @@ else:
     users = load_json(USERS_FILE, {})
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
+        
+        # [수정됨] 회원가입 폼 순서 완벽 조정 (자격 - 학교 - 학번 - 이름 - 비번)
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사", "관리자"])
-        reg_id = st.sidebar.text_input("학번/ID 입력"); reg_name = st.sidebar.text_input("이름 입력"); reg_pw = st.sidebar.text_input("비밀번호", type="password")
+        reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
+        reg_id = st.sidebar.text_input("학번/ID 입력")
+        reg_name = st.sidebar.text_input("이름 입력")
+        reg_pw = st.sidebar.text_input("비밀번호", type="password")
+        
         if st.sidebar.button("가입 신청", use_container_width=True):
-            if reg_id and reg_pw and reg_name:
+            if reg_role and reg_school and reg_id and reg_pw and reg_name:
                 if reg_id in users: st.sidebar.error("❌ 이미 존재하는 ID입니다.")
                 else:
-                    users[reg_id] = {"password": reg_pw, "name": reg_name, "role": reg_role, "school": "호계고등학교"}
+                    users[reg_id] = {"password": reg_pw, "name": reg_name, "role": reg_role, "school": reg_school}
                     save_json(USERS_FILE, users); st.sidebar.success("🎉 가입 완료! 로그인해주세요.")
+            else:
+                st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
+                
     elif auth_choice == "로그인":
         input_id = st.sidebar.text_input("학번/ID"); input_pw = st.sidebar.text_input("비밀번호", type="password")
         if st.sidebar.button("로그인", use_container_width=True):
@@ -248,7 +257,10 @@ else:
         if current_role == "학생":
             tabs_list = ["📌 캠프 공지 및 자료실"] + app_config["tabs"]
             tabs_objects = st.tabs(tabs_list)
-            with tabs_objects[0]: render_camp_overview()
+            
+            with tabs_objects[0]: 
+                render_camp_overview(current_role) # 현재 권한 전달 (학생)
+                
             for index, tab_name in enumerate(app_config["tabs"]):
                 with tabs_objects[index + 1]:
                     st.subheader(f"📘 {tab_name} 활동 및 자료 제출")
@@ -267,11 +279,11 @@ else:
             
             with menu_tabs[0]:
                 st.info("학생들의 첫 화면(첫 번째 탭)으로 표시되는 메인 대시보드입니다.")
-                render_camp_overview()
+                render_camp_overview(current_role) # 현재 권한 전달 (관리자/교사)
 
             with menu_tabs[1]:
                 all_users = load_json(USERS_FILE, {})
-                st.dataframe(pd.DataFrame([{"학번": uid, "이름": info["name"], "권한": info["role"]} for uid, info in all_users.items()]), use_container_width=True)
+                st.dataframe(pd.DataFrame([{"학번": uid, "이름": info["name"], "권한": info["role"], "학교": info["school"]} for uid, info in all_users.items()]), use_container_width=True)
                 if current_role == "관리자":
                     st.markdown("---")
                     delete_target = st.selectbox("삭제할 사용자의 학번/ID를 선택하세요", ["선택"] + list(all_users.keys()))
@@ -280,10 +292,9 @@ else:
                             del all_users[delete_target]
                             save_json(USERS_FILE, all_users); st.success(f"{delete_target} 삭제 완료"); st.rerun()
 
-            # ⚠️ 강사용 특강 PPT 및 링크 업로드 기능이 추가된 차시 편집 탭
             if current_role == "관리자":
                 with menu_tabs[2]:
-                    # 1. 강의 자료 업로드 기능 추가
+                    # 강의 자료 업로드 기능
                     st.subheader("👨‍🏫 교사용 특강 자료 업로드 (PPT, PDF, 외부 링크)")
                     with st.form("upload_lecture_material"):
                         mat_title = st.text_input("자료 제목 (예: 1일차 오리엔테이션 PPT)")
@@ -315,7 +326,6 @@ else:
                                 st.success("성공적으로 등록되었습니다! 메인 화면의 '특강 및 강의 자료실'에 표시됩니다.")
                                 st.rerun()
 
-                    # 2. 업로드된 자료 목록 및 삭제 기능
                     current_materials = app_config.get("materials", [])
                     if current_materials:
                         st.write("🗑️ **등록된 강의 자료 삭제**")
@@ -326,13 +336,12 @@ else:
                     
                     st.markdown("---")
                     
-                    # 기존 차시 추가/삭제 기능 유지
                     st.subheader("⚙️ 차시(Tab) 동적 제어")
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write("➕ **새로운 학습 차시 추가**")
-                        new_tab_name = st.text_input("추가할 차시 이름 입력 (예: 3일차_1차시)")
-                        new_pdf_name = st.text_input("연결할 PDF 파일명 (예: session3_1.pdf)", value="session_new.pdf")
+                        new_tab_name = st.text_input("추가할 차시 이름 입력")
+                        new_pdf_name = st.text_input("연결할 PDF 파일명", value="session_new.pdf")
                         if st.button("차시 개설하기"):
                             if new_tab_name and new_tab_name not in app_config["tabs"]:
                                 app_config["tabs"].append(new_tab_name); app_config["pdfs"][new_tab_name] = new_pdf_name; app_config["questions"][new_tab_name] = []
