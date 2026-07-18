@@ -88,7 +88,7 @@ def render_submission_form(username, category, q_id, q_label):
     with st.form(key=f"form_{username}_{category}_{q_id}"):
         st.markdown(f"**{q_label}**")
         st.caption("텍스트 입력, 외부 링크 주소, 파일 첨부 중 원하는 방식을 하나 이상 선택하여 제출하세요.")
-        text_val = st.text_area("📝 텍스트 내용 작성", value=ans.get("text", ""), height=150)
+        text_val = st.text_area("📝 내용 작성", value=ans.get("text", ""), height=150)
         link_val = st.text_input("🔗 관련 링크(URL) 제출", value=ans.get("link", ""), placeholder="https://...")
         
         if ans.get("file_name"):
