@@ -203,7 +203,6 @@ def render_camp_overview(current_role):
             st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
             st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
 
-        # 💡 [요청사항 반영] 활동지 링크 메뉴를 기본으로 펼쳐지도록 expanded=True 추가
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
@@ -488,50 +487,87 @@ else:
                         if selected_student:
                             student_answers = learning_data.get(selected_student, {})
                             
-                            # 💡 [요청사항 반영] 특정 학생 포트폴리오 다운로드 버튼 추가
-                            report_content = f"[{all_users[selected_student].get('school', '')}] {all_users[selected_student].get('class_group', '')} {all_users[selected_student].get('name', '')} ({all_users[selected_student].get('id', '')}) 학습 포트폴리오\n\n"
-                            report_content += "==== [1] 활동지 작성 내역 ====\n\n"
+                            # 💡 [핵심 수정 1] 깨지지 않는 HTML(웹문서) 포맷으로 전체 포트폴리오 다운로드 지원
+                            st.info("💡 다운로드한 파일을 더블클릭하여 인터넷 창으로 연 뒤, **[우클릭] -> [인쇄] -> [PDF로 저장]**을 누르시면 화면 깨짐 없이 완벽한 PDF 문서가 만들어집니다. (MS Word로 바로 여셔도 표가 깨지지 않습니다!)")
                             
+                            html_content = f"""<!DOCTYPE html>
+                            <html lang="ko">
+                            <head>
+                            <meta charset="UTF-8">
+                            <title>학습 포트폴리오</title>
+                            <style>
+                                body {{ font-family: 'Malgun Gothic', dotum, sans-serif; padding: 40px; line-height: 1.6; color: #333; }}
+                                h1 {{ text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }}
+                                h2 {{ color: #2c3e50; border-left: 5px solid #3498db; padding-left: 10px; margin-top: 40px; }}
+                                h3 {{ color: #2980b9; margin-top: 20px; }}
+                                table {{ width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; font-size: 14px; }}
+                                th, td {{ border: 1px solid #bdc3c7; padding: 10px; text-align: left; }}
+                                th {{ background-color: #ecf0f1; font-weight: bold; text-align: center; }}
+                                .content-box {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #e9ecef; margin-bottom: 20px; white-space: pre-wrap; }}
+                                .link-text {{ color: #e74c3c; font-weight: bold; text-decoration: none; }}
+                            </style>
+                            </head>
+                            <body>
+                                <h1>📚 학습 포트폴리오</h1>
+                                <div style="text-align: right; margin-bottom: 30px; font-size: 16px;">
+                                    <strong>학교:</strong> {all_users[selected_student].get('school', '')}<br>
+                                    <strong>소속:</strong> {all_users[selected_student].get('class_group', '')}<br>
+                                    <strong>이름:</strong> {all_users[selected_student].get('name', '')} ({all_users[selected_student].get('id', '')})
+                                </div>
+                            """
+
+                            html_content += "<h2>📑 [1] 활동지 작성 내역</h2>"
                             for act in ACTIVITIES:
                                 ans = student_answers.get(act, {})
                                 if act == "[활동지1] 진학 희망 학과 조사하기":
                                     if ans.get("is_custom"):
-                                        report_content += f"▶ {act}\n[1단계] 추출한 핵심 내용 요소\n"
+                                        html_content += f"<h3>▶ {act}</h3>"
+                                        html_content += "<h4>[1단계] 추출한 핵심 내용 요소</h4>"
+                                        html_content += "<table><tr><th>학과/전공명</th><th>핵심 내용 요소</th></tr>"
                                         for row in ans.get("df1", []):
-                                            report_content += f" - {row.get('학과/전공명', '')} : {row.get('핵심 내용 요소', '')}\n"
-                                        report_content += "\n[2단계] 생기부 탐구 내용 분석\n"
+                                            html_content += f"<tr><td>{row.get('학과/전공명', '')}</td><td>{row.get('핵심 내용 요소', '')}</td></tr>"
+                                        html_content += "</table>"
+                                        html_content += "<h4>[2단계] 생기부 탐구 내용 분석</h4>"
+                                        html_content += "<table><tr><th>구분</th><th>키워드1</th><th>키워드2</th><th>키워드3</th><th>키워드4</th><th>키워드5</th></tr>"
                                         for row in ans.get("df2", []):
-                                            report_content += f" - {row.get('구분', '')} | {row.get('키워드1','')} | {row.get('키워드2','')} | {row.get('키워드3','')} | {row.get('키워드4','')} | {row.get('키워드5','')}\n"
-                                        report_content += f"\n[3단계] 탐구 주제 및 문제 인식\n{ans.get('step3', '')}\n\n"
+                                            html_content += f"<tr><td><b>{row.get('구분', '')}</b></td><td>{row.get('키워드1','')}</td><td>{row.get('키워드2','')}</td><td>{row.get('키워드3','')}</td><td>{row.get('키워드4','')}</td><td>{row.get('키워드5','')}</td></tr>"
+                                        html_content += "</table>"
+                                        html_content += "<h4>[3단계] 탐구 주제 및 문제 인식</h4>"
+                                        html_content += f"<div class='content-box'>{ans.get('step3', '')}</div>"
                                     continue
+                                    
                                 ans_content = ans.get("content", {})
                                 if isinstance(ans_content, str): ans_content = {"text": ans_content}
                                 if ans_content.get("text") or ans_content.get("link"):
-                                    report_content += f"▶ {act}\n"
-                                    if ans_content.get("text"): report_content += f"📝 텍스트: {ans_content['text']}\n"
-                                    if ans_content.get("link"): report_content += f"🔗 링크: {ans_content['link']}\n"
-                                    report_content += "\n"
-                            
-                            report_content += "==== [2] 차시별 제출 자료 ====\n\n"
+                                    html_content += f"<h3>▶ {act}</h3>"
+                                    if ans_content.get("text"): 
+                                        html_content += f"<b>[텍스트 작성 내용]</b><div class='content-box'>{ans_content['text']}</div>"
+                                    if ans_content.get("link"): 
+                                        html_content += f"<b>[제출 링크]</b> <a href='{ans_content['link']}' target='_blank' class='link-text'>{ans_content['link']}</a><br><br>"
+
+                            html_content += "<h2>📝 [2] 차시별 제출 자료</h2>"
                             for t_name in app_config["tabs"]:
                                 for q in app_config["questions"].get(t_name, []):
                                     ans = student_answers.get(t_name, {}).get(q["id"], {})
                                     if isinstance(ans, str): ans = {"text": ans} 
                                     if ans.get("text") or ans.get("link"):
-                                        report_content += f"▶ [{t_name}] {q.get('label', '')}\n"
-                                        if ans.get("text"): report_content += f"📝 텍스트: {ans['text']}\n"
-                                        if ans.get("link"): report_content += f"🔗 링크: {ans['link']}\n"
-                                        report_content += "\n"
+                                        html_content += f"<h3>▶ [{t_name}] {q.get('label', '')}</h3>"
+                                        if ans.get("text"): 
+                                            html_content += f"<b>[텍스트 작성 내용]</b><div class='content-box'>{ans['text']}</div>"
+                                        if ans.get("link"): 
+                                            html_content += f"<b>[제출 링크]</b> <a href='{ans['link']}' target='_blank' class='link-text'>{ans['link']}</a><br><br>"
+
+                            html_content += "</body></html>"
                             
                             st.download_button(
-                                label=f"📄 {all_users[selected_student].get('name', '학생')}의 전체 활동 데이터 텍스트(.txt) 파일로 다운로드",
-                                data=report_content,
-                                file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.txt",
-                                mime="text/plain",
+                                label=f"📄 {all_users[selected_student].get('name', '학생')}의 포트폴리오 다운로드 (웹문서/PDF 변환용)",
+                                data=html_content.encode('utf-8-sig'),
+                                file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.html",
+                                mime="text/html",
                                 type="primary"
                             )
-                            st.markdown("---")
                             
+                            st.markdown("---")
                             st.markdown("#### 📍 [1] 활동지 작성 내역")
                             for act in ACTIVITIES:
                                 ans = student_answers.get(act, {})
@@ -575,17 +611,14 @@ else:
                         combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
                         selected_view = st.selectbox("다운로드할 데이터 범주를 선택하세요", combined_list)
                         
-                        # 💡 [요청사항 반영] 전체 현황 화면 및 엑셀 출력 형식을 원래 표 양식(세로형)으로 변환
                         if selected_view == "[활동지1] 진학 희망 학과 조사하기":
                             st.info("💡 아래 화면은 입력 형식 그대로 렌더링된 모습이며, 하단의 엑셀 다운로드 버튼을 누르면 세로 형식의 데이터로 깔끔하게 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
                             
-                            # 엑셀 다운로드를 위한 세로 정렬 데이터 생성
                             csv_data = []
                             for s_uid in student_list:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {})
                                 u_info = all_users[s_uid]
                                 
-                                # 화면 출력: 학생별로 분리해서 오리지널 표 렌더링
                                 st.markdown(f"#### 👤 [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})")
                                 st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**")
                                 st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
@@ -595,7 +628,6 @@ else:
                                 st.info(ans.get("step3", "-"))
                                 st.markdown("---")
                                 
-                                # 엑셀 출력: 세로 스태킹 알고리즘
                                 csv_data.append([f"■ [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})", "", "", "", "", ""])
                                 csv_data.append(["[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기", "", "", "", "", ""])
                                 csv_data.append(["학과/전공명", "핵심 내용 요소", "", "", "", ""])
