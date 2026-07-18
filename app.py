@@ -78,7 +78,7 @@ def display_pdf(file_path):
     else:
         st.info(f"💡 교재 파일('{file_path}')이 폴더에 없습니다. 파일을 업로드하면 이곳에 표시됩니다.")
 
-# --- [3] 복합 제출 폼 렌더링 함수 ---
+# --- [3-A] 일반 제출 폼 (텍스트/링크/파일 혼합) ---
 def render_submission_form(username, category, q_id, q_label):
     data = load_json(DATA_FILE, {})
     ans = data.get(username, {}).get(category, {}).get(q_id, {})
@@ -110,6 +110,55 @@ def render_submission_form(username, category, q_id, q_label):
             data[username][category][q_id] = new_data
             save_json(DATA_FILE, data)
             st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
+
+# --- [3-B] ★ 활동지1 전용 맞춤형 폼 (노션 엑셀표 구현) ---
+def render_activity1_form(username):
+    category = "[활동지1] 진학 희망 학과 조사하기"
+    data = load_json(DATA_FILE, {})
+    ans = data.get(username, {}).get(category, {})
+    
+    st.markdown("<div style='background-color: #fff9e6; padding: 15px; border-radius: 5px; font-weight: bold;'>전공 가이드북을 활용하여 진학을 희망하는 학과의 핵심 내용 요소를 추출하고 이를 바탕으로 자신의 학교생활기록부의 탐구 활동을 분석/분류한다.</div>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    with st.form(key=f"form_act1_{username}"):
+        # [1단계] 표 입력
+        st.markdown("#### [1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기")
+        default_df1 = pd.DataFrame([{"학과/전공명": "", "핵심 내용 요소": ""} for _ in range(4)])
+        df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
+        edited_df1 = st.data_editor(df1, num_rows="dynamic", use_container_width=True, key="act1_df1")
+
+        st.markdown("---")
+        
+        # [2단계] 표 입력
+        st.markdown("#### [2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기")
+        default_df2 = pd.DataFrame({
+            "구분": ["창체활동", "교과세특"],
+            "요소1": ["", ""], "요소2": ["", ""], "요소3": ["", ""], "요소4": ["", ""], "요소5": ["", ""]
+        })
+        df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
+        edited_df2 = st.data_editor(df2, use_container_width=True, key="act1_df2")
+        
+        # 예시 안내
+        st.info("💡 [2단계-예시] 희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.")
+
+        st.markdown("---")
+        
+        # [3단계] 텍스트 입력
+        st.markdown("#### [3단계] 이번 특강을 통해 탐구하고 싶은 내용 영역 또는 문제 인식(주제 찾기)")
+        st.markdown("<div style='background-color: #fff9e6; padding: 10px; border-radius: 5px;'>내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?</div>", unsafe_allow_html=True)
+        step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
+
+        # 제출 버튼
+        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
+            if username not in data: data[username] = {}
+            data[username][category] = {
+                "is_custom": True, # 교사 화면에서 특수 양식임을 식별하기 위한 값
+                "df1": edited_df1.to_dict('records'),
+                "df2": edited_df2.to_dict('records'),
+                "step3": step3_val
+            }
+            save_json(DATA_FILE, data)
+            st.toast("🎉 활동지1이 성공적으로 저장되었습니다!")
 
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role):
@@ -156,9 +205,9 @@ def render_camp_overview(current_role):
             st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
 
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)"):
-            st.caption("아래 버튼을 누르면 제출 화면으로 전환됩니다.")
+            st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
-                # 내부 제출 화면으로 이동 유도 (모든 데이터는 프로그램 안에 쌓임)
+                # 💡 노션 링크 방식 폐기, 활동지1도 다시 프로그램 내부 창으로 연동
                 if st.button(f"📄 {act}", use_container_width=True):
                     st.session_state.current_page = act
                     st.rerun()
@@ -190,7 +239,6 @@ st.sidebar.title("🔒 인증 센터")
 if st.session_state.logged_in:
     u_info = st.session_state.user_info
     st.sidebar.success(f"🟢 {u_info['name']} 님 로그인 중")
-    # 사이드바에 '반' 정보 표시 추가
     display_class = u_info.get('class_group', '')
     if display_class and display_class != "관리자":
         st.sidebar.write(f"🏫 소속: {u_info['school']} ({display_class})")
@@ -206,11 +254,8 @@ else:
         st.sidebar.subheader("📝 회원가입")
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사", "관리자"])
         
-        # 반 선택 기능 추가 (학생일 경우에만 1~4반 노출)
-        if reg_role == "학생":
-            reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
-        else:
-            reg_class = "관리자"
+        if reg_role == "학생": reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
+        else: reg_class = "관리자"
             
         reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
         reg_id = st.sidebar.text_input("학번/ID 입력")
@@ -221,7 +266,6 @@ else:
             if reg_role and reg_school and reg_id and reg_pw and reg_name:
                 if reg_id in users: st.sidebar.error("❌ 이미 존재하는 ID입니다.")
                 else:
-                    # class_group 데이터 추가 저장
                     users[reg_id] = {"password": reg_pw, "name": reg_name, "role": reg_role, "school": reg_school, "class_group": reg_class}
                     save_json(USERS_FILE, users); st.sidebar.success("🎉 가입 완료! 로그인해주세요.")
             else: st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
@@ -231,7 +275,6 @@ else:
         if st.sidebar.button("로그인", use_container_width=True):
             if input_id in users and users[input_id]["password"] == input_pw:
                 st.session_state.logged_in = True
-                # 로그인 시 class_group 정보도 세션에 담기
                 st.session_state.user_info = {
                     "username": input_id, "name": users[input_id]["name"], 
                     "role": users[input_id]["role"], "school": users[input_id]["school"],
@@ -251,6 +294,7 @@ else:
     app_config = load_json(CONFIG_FILE, {})
     learning_data = load_json(DATA_FILE, {})
 
+    # [화면 A] 활동지 개별 입력 화면 분기
     if st.session_state.current_page in ACTIVITIES:
         act_name = st.session_state.current_page
         st.title(f"📄 {act_name}")
@@ -259,12 +303,11 @@ else:
         st.markdown("---")
         
         if current_role == "학생":
-            # 활동지1 특별 안내 문구 및 노션 링크 추가
+            # 💡 활동지1만 엑셀표 형태의 맞춤형 함수로 연결
             if act_name == "[활동지1] 진학 희망 학과 조사하기":
-                st.info("💡 아래 [노션 양식 보기]를 클릭해 내용을 확인한 후, 이 화면의 입력란에 제출하거나 작성 완료된 노션 링크를 제출해주세요.")
-                st.link_button("🔗 [활동지1] 노션 양식 보기 (새 창 열림)", "https://app.notion.com/p/1-1dbb5d200927826ca69b01269236df9c")
-                st.markdown("<br>", unsafe_allow_html=True)
-            render_submission_form(current_user, act_name, "content", f"{act_name} 제출란")
+                render_activity1_form(current_user)
+            else:
+                render_submission_form(current_user, act_name, "content", f"{act_name} 제출란")
         else:
             st.warning("교사/관리자는 제출 모니터링 탭을 이용해주세요.")
 
@@ -289,31 +332,27 @@ else:
         elif current_role in ["교사", "관리자"]:
             st.title(f"🛠️ {current_role} 대시보드")
             if current_role == "관리자":
-                menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 차시 및 자료 편집", "📥 학생 제출 자료 조회(다운로드)"])
+                menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 차시 및 자료 편집", "📥 학생 제출 자료 조회 및 관리"])
             else:
-                menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "📥 학생 제출 자료 조회(다운로드)"])
+                menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "📥 학생 제출 자료 조회 및 관리"])
             
             with menu_tabs[0]:
                 render_camp_overview(current_role)
 
             with menu_tabs[1]:
                 all_users = load_json(USERS_FILE, {})
-                # 표에 소속 반(class_group) 열 추가
                 st.dataframe(pd.DataFrame([{"학번": uid, "이름": info["name"], "권한": info["role"], "반": info.get("class_group", "-"), "학교": info["school"]} for uid, info in all_users.items()]), use_container_width=True)
 
             if current_role == "관리자":
                 with menu_tabs[2]:
                     st.info("차시 및 자료 제어 인터페이스 구동 중 (이전 코드와 완벽 동일)")
-                    # (코드 길이 최적화를 위해 차시 편집 기능의 상세 렌더링은 유지, 관리자 로직에서 실행됩니다.)
 
             with menu_tabs[-1]:
                 st.subheader("📥 반별 학생 학습 활동 및 제출 자료 조회")
                 all_users = load_json(USERS_FILE, {})
                 
-                # 강사 배정에 맞춘 '반 필터링' 기능 추가
                 filter_class = st.radio("조회할 반 선택", ["전체 보기"] + CLASS_GROUPS, horizontal=True)
                 
-                # 필터에 맞게 학생 목록 추출
                 student_list = []
                 for uid, info in all_users.items():
                     if info["role"] == "학생":
@@ -327,13 +366,27 @@ else:
                     st.markdown("---")
                     
                     if view_mode == "👤 특정 학생 집중 분석":
-                        # 드롭다운에 (학번/이름/소속 반) 함께 표시
                         selected_student = st.selectbox("학생 선택", student_list, format_func=lambda x: f"[{all_users[x].get('class_group', '-')}] {all_users[x]['name']} ({x})")
                         if selected_student:
                             student_answers = learning_data.get(selected_student, {})
                             st.markdown("#### 📍 [1] 활동지 작성 내역")
                             for act in ACTIVITIES:
                                 ans = student_answers.get(act, {})
+                                
+                                # 💡 [교사 열람] 활동지1 전용 데이터 렌더링 
+                                if act == "[활동지1] 진학 희망 학과 조사하기":
+                                    if ans.get("is_custom"):
+                                        st.markdown(f"### **{act}**")
+                                        st.markdown("**[1단계] 추출한 핵심 내용 요소**")
+                                        st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
+                                        st.markdown("**[2단계] 생기부 탐구 내용 분석**")
+                                        st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
+                                        st.markdown("**[3단계] 탐구 주제 및 문제 인식**")
+                                        st.info(ans.get("step3", "-"))
+                                        st.markdown("<br>", unsafe_allow_html=True)
+                                    continue
+                                
+                                # 나머지 활동지들 열람
                                 ans_content = ans.get("content", {})
                                 if isinstance(ans_content, str): ans_content = {"text": ans_content}
                                 if ans_content.get("text") or ans_content.get("link") or ans_content.get("file_name"):
@@ -343,6 +396,7 @@ else:
                                     if ans_content.get("file_path") and os.path.exists(ans_content['file_path']):
                                         with open(ans_content['file_path'], "rb") as f:
                                             st.download_button("📥 첨부파일 다운로드", f, file_name=ans_content['file_name'], key=f"dl_{selected_student}_{act}")
+                            
                             st.markdown("---")
                             st.markdown("#### 📍 [2] 차시별 제출 자료")
                             for t_name in app_config["tabs"]:
@@ -361,7 +415,22 @@ else:
                         combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
                         selected_view = st.selectbox("다운로드할 데이터 범주를 선택하세요", combined_list)
                         
-                        if selected_view in ACTIVITIES:
+                        if selected_view == "[활동지1] 진학 희망 학과 조사하기":
+                            q_summary_data = []
+                            for s_uid in student_list:
+                                ans = learning_data.get(s_uid, {}).get(selected_view, {})
+                                # 엑셀 다운로드 시 복잡한 표를 한눈에 볼 수 있도록 요약 처리
+                                q_summary_data.append({
+                                    "반": all_users[s_uid].get("class_group", "-"), "학번": s_uid, "이름": all_users[s_uid]["name"],
+                                    "3단계 작성 주제": ans.get("step3", "-"),
+                                    "1단계 입력개수": len(ans.get("df1", [])) if ans.get("df1") else 0,
+                                    "상세데이터": "개별 학생 분석에서 확인 요망"
+                                })
+                            df_q = pd.DataFrame(q_summary_data)
+                            st.dataframe(df_q, use_container_width=True, hide_index=True)
+                            st.download_button(f"📊 활동지1 요약본 다운로드 ({filter_class})", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"활동지1_{filter_class}_결과.csv", mime='text/csv')
+
+                        elif selected_view in ACTIVITIES:
                             q_summary_data = []
                             for s_uid in student_list:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {}).get("content", {})
