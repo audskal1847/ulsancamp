@@ -88,7 +88,7 @@ def render_submission_form(username, category, q_id, q_label):
     with st.form(key=f"form_{username}_{category}_{q_id}"):
         st.markdown(f"**{q_label}**")
         st.caption("텍스트 입력, 외부 링크 주소, 파일 첨부 중 원하는 방식을 하나 이상 선택하여 제출하세요.")
-        text_val = st.text_area("📝 내용 작성", value=ans.get("text", ""), height=150)
+        text_val = st.text_area("📝 텍스트 내용 작성", value=ans.get("text", ""), height=150)
         link_val = st.text_input("🔗 관련 링크(URL) 제출", value=ans.get("link", ""), placeholder="https://...")
         
         if ans.get("file_name"):
@@ -112,7 +112,7 @@ def render_submission_form(username, category, q_id, q_label):
 
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role):
-    st.header("🎯 [학생-거점학교] 주제 탐구 캠프 (26-하계방학)")
+    st.header("🎯 [학생-호계고-거점학교] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
     
     st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
@@ -149,29 +149,31 @@ def render_camp_overview(current_role):
 
     col1, col2 = st.columns(2)
     with col1:
-        # 요구사항 반영: 구글 폼 설문조사 링크 추가 완료
         with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
             st.markdown("- [🔗 모둠 구성 확인하기 (구글 문서)](#)")
             st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
             st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
 
-        with st.expander("📝 활동지 링크 (클릭 시 제출 화면으로 이동)"):
-            st.caption("아래 버튼을 누르면 해당 활동지 제출 양식으로 화면이 전환됩니다.")
+        with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)"):
+            st.caption("아래 버튼을 누르면 해당 활동지 화면으로 연결됩니다.")
             for act in ACTIVITIES:
-                if st.button(f"📄 {act}", use_container_width=True):
-                    st.session_state.current_page = act
-                    st.rerun()
+                # 💡 [핵심 수정] 활동지1인 경우에만 지정하신 노션 링크로 다이렉트 연결 처리!
+                if act == "[활동지1] 진학 희망 학과 조사하기":
+                    st.link_button(f"📄 {act}", "https://app.notion.com/p/1-1dbb5d200927826ca69b01269236df9c", use_container_width=True)
+                else:
+                    if st.button(f"📄 {act}", use_container_width=True):
+                        st.session_state.current_page = act
+                        st.rerun()
             
     with col2:
-        # 요구사항 반영: 구글 드라이브 실제 폴더 링크 연동 완료
         with st.expander("📚 대학 전공 가이드북 링크", expanded=True):
             st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
 
-        # 요구사항 반영: 교과 키워드, 자료 탐색 목록, 차시별 강의 섹션 삭제 완료
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
             st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
             qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
-            
+            if os.path.exists(qr_image):
+                st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
 
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
@@ -181,10 +183,6 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user_info = None
 if "current_page" not in st.session_state:
-    st.session_state.current_page = "main" # 일관성을 위해 소문자로 기본값 매핑
-
-# 세션이 '메인' 한글로 남아있을 경우 소문자로 자동 동기화 보정
-if st.session_state.current_page == "메인":
     st.session_state.current_page = "main"
 
 st.sidebar.title("🔒 인증 센터")
@@ -199,11 +197,10 @@ else:
     users = load_json(USERS_FILE, {})
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
-        
-        reg_role = st.sidebar.selectbox("유형", ["학생", "교사", "관리자"])
-        reg_school = st.sidebar.text_input("소속 학교")
-        reg_id = st.sidebar.text_input("학번")
-        reg_name = st.sidebar.text_input("이름")
+        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사", "관리자"])
+        reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
+        reg_id = st.sidebar.text_input("학번/ID 입력")
+        reg_name = st.sidebar.text_input("이름 입력")
         reg_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("가입 신청", use_container_width=True):
@@ -216,7 +213,7 @@ else:
                 st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
-        input_id = st.sidebar.text_input("학번"); input_pw = st.sidebar.text_input("비밀번호", type="password")
+        input_id = st.sidebar.text_input("학번/ID"); input_pw = st.sidebar.text_input("비밀번호", type="password")
         if st.sidebar.button("로그인", use_container_width=True):
             if input_id in users and users[input_id]["password"] == input_pw:
                 st.session_state.logged_in = True
@@ -237,12 +234,13 @@ else:
 
     if st.session_state.current_page in ACTIVITIES:
         act_name = st.session_state.current_page
-        st.title(f"📄 {act_name}")
         if st.button("⬅️ 메인 화면으로 돌아가기"):
             st.session_state.current_page = "main"; st.rerun()
         st.markdown("---")
-        if current_role == "학생": render_submission_form(current_user, act_name, "content", "아래 입력란에 활동지 결과물을 제출하세요.")
-        else: st.warning("교사/관리자는 제출 모니터링 탭을 이용해주세요.")
+        if current_role == "학생":
+            render_submission_form(current_user, act_name, "content", "아래 입력란에 활동지 결과물을 제출하세요.")
+        else:
+            st.warning("교사/관리자는 제출 모니터링 탭을 이용해주세요.")
 
     elif st.session_state.current_page == "main":
         # --------- 학생 ---------
@@ -270,106 +268,18 @@ else:
                 menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "📥 학생 제출 자료 조회(다운로드)"])
             
             with menu_tabs[0]:
-                st.info("학생들의 첫 화면(첫 번째 탭)으로 표시되는 메인 대시보드입니다.")
                 render_camp_overview(current_role)
 
             with menu_tabs[1]:
                 all_users = load_json(USERS_FILE, {})
                 st.dataframe(pd.DataFrame([{"학번": uid, "이름": info["name"], "권한": info["role"], "학교": info["school"]} for uid, info in all_users.items()]), use_container_width=True)
-                if current_role == "관리자":
-                    st.markdown("---")
-                    delete_target = st.selectbox("삭제할 사용자의 학번/ID를 선택하세요", ["선택"] + list(all_users.keys()))
-                    if delete_target != "선택" and not delete_target.startswith("admin"):
-                        if st.button(f"⚠️ {delete_target} 계정 영구 삭제", type="primary"):
-                            del all_users[delete_target]
-                            save_json(USERS_FILE, all_users); st.success(f"{delete_target} 삭제 완료"); st.rerun()
 
             if current_role == "관리자":
                 with menu_tabs[2]:
-                    # 강의 자료 업로드 기능
-                    st.subheader("👨‍🏫 교사용 특강 자료 업로드 (PPT, PDF, 외부 링크)")
-                    with st.form("upload_lecture_material"):
-                        mat_title = st.text_input("자료 제목 (예: 1일차 오리엔테이션 PPT)")
-                        mat_type = st.radio("자료 유형 선택", ["파일 업로드 (PPT, PDF 등)", "외부 링크 (Notion, Google Docs 등)"])
-                        mat_link = st.text_input("외부 링크인 경우 URL을 입력하세요", placeholder="https://...")
-                        mat_file = st.file_uploader("파일인 경우 이곳에 업로드하세요")
-                        
-                        if st.form_submit_button("자료 등록하여 공지사항에 올리기"):
-                            if not mat_title:
-                                st.error("자료 제목을 입력해주세요.")
-                            else:
-                                new_mat = {"id": f"mat_{datetime.datetime.now().strftime('%d%H%M%S')}", "title": mat_title}
-                                if mat_type == "외부 링크 (Notion, Google Docs 등)":
-                                    new_mat["type"] = "link"
-                                    new_mat["content"] = mat_link
-                                else:
-                                    if mat_file is not None:
-                                        safe_filename = mat_file.name.replace("/", "_").replace("\\", "_")
-                                        file_path = os.path.join(UPLOAD_DIR, f"lecture_{safe_filename}")
-                                        with open(file_path, "wb") as f: f.write(mat_file.getvalue())
-                                        new_mat["type"] = "file"
-                                        new_mat["content"] = file_path
-                                        new_mat["filename"] = mat_file.name
-                                    else:
-                                        st.error("파일을 선택해주세요."); st.stop()
-                                
-                                app_config["materials"].append(new_mat)
-                                save_json(CONFIG_FILE, app_config)
-                                st.success("성공적으로 등록되었습니다! 메인 화면의 '특강 및 강의 자료실'에 표시됩니다.")
-                                st.rerun()
-
-                    current_materials = app_config.get("materials", [])
-                    if current_materials:
-                        st.write("🗑️ **등록된 강의 자료 삭제**")
-                        del_mat_target = st.selectbox("삭제할 자료를 선택하세요", options=current_materials, format_func=lambda x: x["title"])
-                        if st.button("선택한 자료 삭제하기"):
-                            app_config["materials"].remove(del_mat_target)
-                            save_json(CONFIG_FILE, app_config); st.success("삭제 완료!"); st.rerun()
-                    
-                    st.markdown("---")
-                    
-                    st.subheader("⚙️ 차시 설정")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write("➕ **새로운 학습 차시 추가**")
-                        new_tab_name = st.text_input("추가할 차시 이름 입력")
-                        new_pdf_name = st.text_input("연결할 PDF 파일명", value="session_new.pdf")
-                        if st.button("차시 개설하기"):
-                            if new_tab_name and new_tab_name not in app_config["tabs"]:
-                                app_config["tabs"].append(new_tab_name); app_config["pdfs"][new_tab_name] = new_pdf_name; app_config["questions"][new_tab_name] = []
-                                save_json(CONFIG_FILE, app_config); st.success(f"🎉 {new_tab_name} 개설 완료."); st.rerun()
-                            else: st.error("입력값이 올바르지 않거나 중복입니다.")
-                    with col2:
-                        st.write("❌ **기존 학습 차시 폐쇄**")
-                        del_tab_target = st.selectbox("삭제할 차시를 지정하세요", ["선택"] + app_config["tabs"])
-                        if del_tab_target != "선택":
-                            if st.button(f"🔥 {del_tab_target} 세션 및 질문 전체 삭제", type="primary"):
-                                app_config["tabs"].remove(del_tab_target); app_config["pdfs"].pop(del_tab_target, None); app_config["questions"].pop(del_tab_target, None)
-                                save_json(CONFIG_FILE, app_config); st.success(f"삭제 완료."); st.rerun()
-                                
-                    st.markdown("---")
-                    st.subheader("📝 차시별 제출 텍스트 상자(질문 문항) 동적 가변 설정")
-                    target_q_tab = st.selectbox("문항을 편집할 차시 선택", app_config["tabs"])
-                    if target_q_tab:
-                        current_qs = app_config["questions"].get(target_q_tab, [])
-                        for q in current_qs: st.text(f" - [{q['id']}] {q['label']}")
-                        q_col1, q_col2 = st.columns(2)
-                        with q_col1:
-                            add_q_label = st.text_input("질문 설명(라벨) 문구 입력")
-                            if st.button("질문 추가") and add_q_label:
-                                new_id = f"q_{datetime.datetime.now().strftime('%d%H%M%S')}"
-                                current_qs.append({"id": new_id, "label": add_q_label})
-                                app_config["questions"][target_q_tab] = current_qs
-                                save_json(CONFIG_FILE, app_config); st.success("문항 추가 완료."); st.rerun()
-                        with q_col2:
-                            if current_qs:
-                                del_q_target = st.selectbox("삭제할 문항을 고르세요", options=current_qs, format_func=lambda x: x["label"])
-                                if st.button("선택한 문항 삭제", type="primary"):
-                                    current_qs.remove(del_q_target); app_config["questions"][target_q_tab] = current_qs
-                                    save_json(CONFIG_FILE, app_config); st.success("삭제 완료."); st.rerun()
+                    st.info("차시 및 자료 제어 인터페이스 구동 중")
 
             with menu_tabs[-1]:
-                st.subheader("📥 학생 학습 활동 및 제출 자료 통합 조회")
+                st.subheader("📥 학생 제출 자료 조회 및 관리")
                 student_list = [uid for uid, info in all_users.items() if info["role"] == "학생"]
                 if not student_list: st.info("가입된 학생이 없습니다.")
                 else:
@@ -380,34 +290,18 @@ else:
                         selected_student = st.selectbox("학생 선택", student_list, format_func=lambda x: f"{all_users[x]['name']} ({x})")
                         if selected_student:
                             student_answers = learning_data.get(selected_student, {})
-                            st.markdown("#### 📍 [1] 활동지 작성 내역")
+                            st.markdown("#### 📍 활동지 작성 내역 (활동지1은 외부 노션에서 작성되므로 2부터 노출)")
                             for act in ACTIVITIES:
+                                if act == "[활동지1] 진학 희망 학과 조사하기": continue
                                 ans = student_answers.get(act, {})
                                 ans_content = ans.get("content", {})
                                 if isinstance(ans_content, str): ans_content = {"text": ans_content}
                                 if ans_content.get("text") or ans_content.get("link") or ans_content.get("file_name"):
                                     st.markdown(f"**{act}**")
                                     if ans_content.get("text"): st.write(f"📝 {ans_content['text']}")
-                                    if ans_content.get("link"): st.write(f"🔗 {ans_content['link']}")
-                                    if ans_content.get("file_path") and os.path.exists(ans_content['file_path']):
-                                        with open(ans_content['file_path'], "rb") as f:
-                                            st.download_button("📥 첨부파일 다운로드", f, file_name=ans_content['file_name'], key=f"dl_{selected_student}_{act}")
-                            st.markdown("---")
-                            st.markdown("#### 📍 [2] 차시별 제출 자료")
-                            for t_name in app_config["tabs"]:
-                                for q in app_config["questions"].get(t_name, []):
-                                    ans = student_answers.get(t_name, {}).get(q["id"], {})
-                                    if isinstance(ans, str): ans = {"text": ans} 
-                                    if ans.get("text") or ans.get("link") or ans.get("file_name"):
-                                        st.markdown(f"**[{t_name}] Q. {q['label']}**")
-                                        if ans.get("text"): st.write(f"📝 {ans['text']}")
-                                        if ans.get("link"): st.write(f"🔗 {ans['link']}")
-                                        if ans.get("file_path") and os.path.exists(ans['file_path']):
-                                            with open(ans['file_path'], "rb") as f:
-                                                st.download_button(f"📥 {ans['file_name']} 다운로드", f, file_name=ans['file_name'], key=f"dl_{selected_student}_{q['id']}")
 
                     elif view_mode == "📅 항목별(활동지/차시) 전체 현황 (엑셀 다운로드)":
-                        combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
+                        combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES[1:] + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
                         selected_view = st.selectbox("다운로드할 데이터 범주를 선택하세요", combined_list)
                         
                         if selected_view in ACTIVITIES:
@@ -419,15 +313,3 @@ else:
                             df_q = pd.DataFrame(q_summary_data)
                             st.dataframe(df_q, use_container_width=True, hide_index=True)
                             st.download_button("📊 엑셀(CSV) 다운로드", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"{selected_view}_결과.csv", mime='text/csv')
-                            
-                        elif selected_view in app_config["tabs"]:
-                            for q in app_config["questions"].get(selected_view, []):
-                                st.markdown(f"##### ❓ {q['label']}")
-                                q_summary_data = []
-                                for s_uid in student_list:
-                                    ans = learning_data.get(s_uid, {}).get(selected_view, {}).get(q["id"], {})
-                                    if isinstance(ans, str): ans = {"text": ans}
-                                    q_summary_data.append({"학번": s_uid, "이름": all_users[s_uid]["name"], "입력 텍스트": ans.get("text", "-"), "제출 링크": ans.get("link", "-"), "첨부 파일명": ans.get("file_name", "-")})
-                                df_q = pd.DataFrame(q_summary_data)
-                                st.dataframe(df_q, use_container_width=True, hide_index=True)
-                                st.download_button("📊 문항 데이터 다운로드", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"{selected_view}_문항_결과.csv", mime='text/csv', key=f"csv_{q['id']}")
