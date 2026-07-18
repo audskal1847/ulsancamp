@@ -1,0 +1,38 @@
+{
+    "admin": {
+        "password": "admin123",
+        "name": "관리자",
+        "role": "관리자",
+        "school": "신선여자고등학교"
+    },
+    "admin1": {
+        "password": "admin123",
+        "name": "관리자1",
+        "role": "관리자",
+        "school": "신선여자고등학교"
+    },
+    "admin2": {
+        "password": "admin123",
+        "name": "관리자2",
+        "role": "관리자",
+        "school": "신선여자고등학교"
+    },
+    "admin3": {
+        "password": "admin123",
+        "name": "관리자3",
+        "role": "관리자",
+        "school": "신선여자고등학교"
+    },
+    "admin4": {
+        "password": "admin123",
+        "name": "관리자4",
+        "role": "관리자",
+        "school": "신선여자고등학교"
+    },
+    "10101": {
+        "password": "1357",
+        "name": "홍길동",
+        "role": "학생",
+        "school": "함월고등학교"
+    }
+}
