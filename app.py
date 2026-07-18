@@ -140,12 +140,14 @@ def render_activity1_form(user_key):
         edited_df2 = st.data_editor(df2, use_container_width=True, key="act1_df2")
         
         st.markdown("<br>#### [2단계-예시]", unsafe_allow_html=True)
-        # 💡 [핵심 수정] 전달해주신 스크린샷 이미지 출력 코드 추가
-        example_image = os.path.join(os.path.dirname(__file__), "스크린샷 2026-07-18 214218.png")
+        
+        # 💡 파일명을 단순한 영어(example.png)로 변경하여 인식 오류를 원천 차단합니다.
+        example_image = "example.png"
+        
         if os.path.exists(example_image):
             st.image(example_image, caption="희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.", use_container_width=True)
         else:
-            st.info("💡 [2단계-예시] 희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요. (현재 폴더에 '스크린샷 2026-07-18 214218.png' 파일이 없어 이미지가 표시되지 않습니다.)")
+            st.info("💡 [2단계-예시] 희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.")
             
         st.markdown("---")
         
