@@ -224,7 +224,7 @@ else:
                 st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
-        input_id = st.sidebar.text_input("학번/ID"); input_pw = st.sidebar.text_input("비밀번호", type="password")
+        input_id = st.sidebar.text_input("학번"); input_pw = st.sidebar.text_input("비밀번호", type="password")
         if st.sidebar.button("로그인", use_container_width=True):
             if input_id in users and users[input_id]["password"] == input_pw:
                 st.session_state.logged_in = True
