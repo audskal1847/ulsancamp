@@ -16,7 +16,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 CLASS_GROUPS = ["1반", "2반", "3반", "4반"]
 
-# 💡 [핵심 설정] 관리자 4명의 계정을 절대값으로 지정 (파일 손상 시에도 무조건 로그인 가능)
+# 관리자 4명의 계정을 절대값으로 지정
 ADMIN_ACCOUNTS = {
     "admin1": "admin11",
     "admin2": "admin22",
@@ -251,15 +251,12 @@ else:
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
         
-        # 💡 [핵심 수정] 회원가입 유형 선택 ('관리자' 제거, 오직 2개)
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
-        
-        # 학생을 선택했을 때만 학교와 반을 물어봅니다. 교사는 묻지 않습니다.
         if reg_role == "학생": 
             reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
             reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
         else: 
-            reg_school = "교사소속" # 교사는 내부적으로 기본값 배정
+            reg_school = "교사소속"
             reg_class = "교사"
             
         reg_id = st.sidebar.text_input("학번/ID 입력")
@@ -276,10 +273,8 @@ else:
             else: st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
-        # 💡 [핵심 수정] 로그인 계정 유형도 '학생', '교사' 단 2가지로 통일
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사"])
         
-        # 학생을 선택했을 때만 소속 학교를 묻습니다. 교사를 누르면 사라집니다.
         if login_type == "학생":
             login_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
         else:
@@ -289,7 +284,6 @@ else:
         input_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("로그인", use_container_width=True):
-            # 💡 [핵심 방어 로직] 4명의 관리자는 무조건 패스 (users.json 꼬임 완벽 방지)
             if input_id in ADMIN_ACCOUNTS and input_pw == ADMIN_ACCOUNTS[input_id]:
                 st.session_state.logged_in = True
                 st.session_state.user_info = {
@@ -299,11 +293,9 @@ else:
                 }
                 st.rerun()
             else:
-                # 관리자가 아닌 일반 학생/교사 로그인 로직
                 user_key = f"{login_school}_{input_id}" if login_type == "학생" else f"teacher_{input_id}"
                 
                 if user_key in users and users[user_key]["password"] == input_pw:
-                    # 계정 유형이 맞는지 한 번 더 검증
                     if users[user_key]["role"] == login_type:
                         st.session_state.logged_in = True
                         st.session_state.user_info = {
@@ -315,7 +307,7 @@ else:
                     else:
                         st.sidebar.error("❌ 가입하신 계정 유형(학생/교사)이 다릅니다.")
                 else: 
-                    st.sidebar.error("❌ 학번/ID 또는 비밀번호가 틀렸습니다.")
+                    st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
 # --- [5] 화면 분기 로직 ---
 if not st.session_state.logged_in:
@@ -341,7 +333,6 @@ else:
         else: st.warning("교사/관리자는 제출 모니터링 탭을 이용해주세요.")
 
     elif st.session_state.current_page == "main":
-        # --------- 학생 ---------
         if current_role == "학생":
             tabs_list = ["📌 캠프 공지 및 자료실"] + app_config["tabs"]
             tabs_objects = st.tabs(tabs_list)
@@ -356,7 +347,6 @@ else:
                     questions = app_config["questions"].get(tab_name, [])
                     for q in questions: render_submission_form(current_user_key, tab_name, q["id"], q["label"])
 
-        # --------- 관리자/교사 ---------
         elif current_role in ["교사", "관리자"]:
             st.title(f"🛠️ {current_role} 대시보드")
             if current_role == "관리자":
@@ -366,12 +356,138 @@ else:
             
             with menu_tabs[0]: render_camp_overview(current_role)
 
+            # 💡 [핵심 복구 1] 회원 관리 기능 완벽 구현 (비밀번호 노출 및 삭제/변경 기능)
             with menu_tabs[1]:
+                st.subheader("👥 가입 회원 목록 및 관리")
                 all_users = load_json(USERS_FILE, {})
-                st.dataframe(pd.DataFrame([{"학교": info.get("school", "-"), "학번/ID": info.get("id", uid.split('_')[-1]), "이름": info["name"], "권한": info["role"], "반": info.get("class_group", "-")} for uid, info in all_users.items()]), use_container_width=True)
+                
+                # 표에 비밀번호 포함하여 출력
+                df_users = pd.DataFrame([{
+                    "학교": info.get("school", "-"), 
+                    "학번/ID": info.get("id", uid.split('_')[-1]), 
+                    "이름": info["name"], 
+                    "권한": info["role"], 
+                    "반": info.get("class_group", "-"),
+                    "비밀번호": info.get("password", "")
+                } for uid, info in all_users.items()])
+                
+                st.dataframe(df_users, use_container_width=True)
 
+                if current_role == "관리자":
+                    st.markdown("---")
+                    st.subheader("⚙️ 개별 회원 제어")
+                    col1, col2 = st.columns(2)
+                    
+                    # 최고 관리자 계정을 제외한 목록 생성 (삭제/수정 방지)
+                    editable_users = [u for u in all_users.keys() if u not in ADMIN_ACCOUNTS]
+                    
+                    with col1:
+                        st.write("❌ **회원 강제 탈퇴(삭제)**")
+                        delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x]['school']}] {all_users[x]['name']} ({all_users[x]['id']})")
+                        if delete_target != "선택":
+                            if st.button(f"⚠️ {all_users[delete_target]['name']} 회원 데이터 영구 삭제", type="primary"):
+                                del all_users[delete_target]
+                                save_json(USERS_FILE, all_users)
+                                st.success("삭제 완료")
+                                st.rerun()
+
+                    with col2:
+                        st.write("🔑 **학생/교사 비밀번호 강제 변경**")
+                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x]['school']}] {all_users[x]['name']} ({all_users[x]['id']})")
+                        new_pw = st.text_input("새로운 비밀번호 입력", type="password")
+                        if pw_target != "선택":
+                            if st.button("비밀번호 변경 적용"):
+                                if new_pw:
+                                    all_users[pw_target]["password"] = new_pw
+                                    save_json(USERS_FILE, all_users)
+                                    st.success("비밀번호가 성공적으로 변경되었습니다.")
+                                    st.rerun()
+                                else:
+                                    st.error("새 비밀번호를 입력해주세요.")
+
+            # 💡 [핵심 복구 2] 차시 및 자료 편집 전체 기능 원상 복구
             if current_role == "관리자":
-                with menu_tabs[2]: st.info("차시 및 자료 제어 인터페이스 구동 중 (이전 코드와 완벽 동일)")
+                with menu_tabs[2]:
+                    st.subheader("👨‍🏫 교사용 특강 자료 업로드 (PPT, PDF, 외부 링크)")
+                    with st.form("upload_lecture_material"):
+                        mat_title = st.text_input("자료 제목 (예: 1일차 오리엔테이션 PPT)")
+                        mat_type = st.radio("자료 유형 선택", ["파일 업로드 (PPT, PDF 등)", "외부 링크 (Notion, Google Docs 등)"])
+                        mat_link = st.text_input("외부 링크인 경우 URL을 입력하세요", placeholder="https://...")
+                        mat_file = st.file_uploader("파일인 경우 이곳에 업로드하세요")
+                        
+                        if st.form_submit_button("자료 등록하여 공지사항에 올리기"):
+                            if not mat_title:
+                                st.error("자료 제목을 입력해주세요.")
+                            else:
+                                new_mat = {"id": f"mat_{datetime.datetime.now().strftime('%d%H%M%S')}", "title": mat_title}
+                                if mat_type == "외부 링크 (Notion, Google Docs 등)":
+                                    new_mat["type"] = "link"
+                                    new_mat["content"] = mat_link
+                                else:
+                                    if mat_file is not None:
+                                        safe_filename = mat_file.name.replace("/", "_").replace("\\", "_")
+                                        file_path = os.path.join(UPLOAD_DIR, f"lecture_{safe_filename}")
+                                        with open(file_path, "wb") as f: f.write(mat_file.getvalue())
+                                        new_mat["type"] = "file"
+                                        new_mat["content"] = file_path
+                                        new_mat["filename"] = mat_file.name
+                                    else:
+                                        st.error("파일을 선택해주세요."); st.stop()
+                                
+                                app_config["materials"].append(new_mat)
+                                save_json(CONFIG_FILE, app_config)
+                                st.success("성공적으로 등록되었습니다! 메인 화면의 '특강 및 강의 자료실'에 표시됩니다.")
+                                st.rerun()
+
+                    current_materials = app_config.get("materials", [])
+                    if current_materials:
+                        st.write("🗑️ **등록된 강의 자료 삭제**")
+                        del_mat_target = st.selectbox("삭제할 자료를 선택하세요", options=current_materials, format_func=lambda x: x["title"])
+                        if st.button("선택한 자료 삭제하기"):
+                            app_config["materials"].remove(del_mat_target)
+                            save_json(CONFIG_FILE, app_config); st.success("삭제 완료!"); st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    st.subheader("⚙️ 차시(Tab) 동적 제어 (5차시 이상 무한 생성 가능)")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.write("➕ **새로운 학습 차시 추가**")
+                        new_tab_name = st.text_input("추가할 차시 이름 입력")
+                        new_pdf_name = st.text_input("연결할 PDF 파일명", value="session_new.pdf")
+                        if st.button("차시 개설하기"):
+                            if new_tab_name and new_tab_name not in app_config["tabs"]:
+                                app_config["tabs"].append(new_tab_name); app_config["pdfs"][new_tab_name] = new_pdf_name; app_config["questions"][new_tab_name] = []
+                                save_json(CONFIG_FILE, app_config); st.success(f"🎉 {new_tab_name} 개설 완료."); st.rerun()
+                            else: st.error("입력값이 올바르지 않거나 중복입니다.")
+                    with col2:
+                        st.write("❌ **기존 학습 차시 폐쇄**")
+                        del_tab_target = st.selectbox("삭제할 차시를 지정하세요", ["선택"] + app_config["tabs"])
+                        if del_tab_target != "선택":
+                            if st.button(f"🔥 {del_tab_target} 세션 및 질문 전체 삭제", type="primary"):
+                                app_config["tabs"].remove(del_tab_target); app_config["pdfs"].pop(del_tab_target, None); app_config["questions"].pop(del_tab_target, None)
+                                save_json(CONFIG_FILE, app_config); st.success(f"삭제 완료."); st.rerun()
+                                
+                    st.markdown("---")
+                    st.subheader("📝 차시별 제출 텍스트 상자(질문 문항) 동적 가변 설정")
+                    target_q_tab = st.selectbox("문항을 편집할 차시 선택", app_config["tabs"])
+                    if target_q_tab:
+                        current_qs = app_config["questions"].get(target_q_tab, [])
+                        for q in current_qs: st.text(f" - [{q['id']}] {q['label']}")
+                        q_col1, q_col2 = st.columns(2)
+                        with q_col1:
+                            add_q_label = st.text_input("질문 설명(라벨) 문구 입력")
+                            if st.button("질문 추가") and add_q_label:
+                                new_id = f"q_{datetime.datetime.now().strftime('%d%H%M%S')}"
+                                current_qs.append({"id": new_id, "label": add_q_label})
+                                app_config["questions"][target_q_tab] = current_qs
+                                save_json(CONFIG_FILE, app_config); st.success("문항 추가 완료."); st.rerun()
+                        with q_col2:
+                            if current_qs:
+                                del_q_target = st.selectbox("삭제할 문항을 고르세요", options=current_qs, format_func=lambda x: x["label"])
+                                if st.button("선택한 문항 삭제", type="primary"):
+                                    current_qs.remove(del_q_target); app_config["questions"][target_q_tab] = current_qs
+                                    save_json(CONFIG_FILE, app_config); st.success("삭제 완료."); st.rerun()
 
             with menu_tabs[-1]:
                 st.subheader("📥 반별 학생 학습 활동 및 제출 자료 조회")
