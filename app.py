@@ -48,7 +48,7 @@ def init_system():
     users = load_json(USERS_FILE, {})
     updated = False
     
-    # 💡 [핵심 수정] 4명의 지정된 관리자 계정 하드코딩
+    # 4명의 관리자 계정 하드코딩 (자동 생성)
     admins = {
         "admin1": "admin11",
         "admin2": "admin22",
@@ -58,7 +58,6 @@ def init_system():
     
     for a_id, a_pw in admins.items():
         if a_id not in users:
-            # 관리자는 학교명 결합 없이 ID 자체를 고유 키로 사용합니다.
             users[a_id] = {
                 "id": a_id, "password": a_pw, "name": f"총괄운영자({a_id})", 
                 "role": "관리자", "school": "운영본부", "class_group": "관리자"
@@ -263,10 +262,13 @@ else:
     
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
-        # 💡 [보안 수정] 회원가입에서 '관리자' 옵션 삭제 (관리자는 하드코딩된 4개 계정만 사용)
+        
+        # 💡 [핵심 수정] 회원가입 자격 선택을 '학생', '교사' 두 가지로만 제한
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
-        if reg_role == "학생": reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
-        else: reg_class = "교사"
+        if reg_role == "학생": 
+            reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
+        else: 
+            reg_class = "교사"
             
         reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
         reg_id = st.sidebar.text_input("학번/ID 입력")
@@ -283,23 +285,19 @@ else:
             else: st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
-        # 💡 [핵심 수정] 로그인 시 관리자와 일반 사용자 분리
-        login_type = st.sidebar.radio("로그인 계정 유형", ["학생 및 교사", "관리자"])
+        # 💡 [핵심 수정] 로그인 계정 유형도 '학생', '교사' 두 가지로만 깔끔하게 제한
+        login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사"])
         
-        if login_type == "학생 및 교사":
-            login_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
-            input_id = st.sidebar.text_input("학번/ID")
-        else:
-            login_school = "운영본부" # 관리자는 내부적으로 운영본부 소속으로 처리
-            input_id = st.sidebar.text_input("관리자 ID (예: admin1)")
-            
+        login_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
+        input_id = st.sidebar.text_input("학번/ID")
         input_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("로그인", use_container_width=True):
-            if login_type == "관리자":
-                user_key = input_id # 관리자는 ID가 곧 키값
+            # 💡 [핵심 로직] 아이디가 admin1~admin4 중 하나라면 무조건 관리자로 우회 통과
+            if input_id in ["admin1", "admin2", "admin3", "admin4"]:
+                user_key = input_id
             else:
-                user_key = f"{login_school}_{input_id}" # 학생/교사는 학교+학번이 키값
+                user_key = f"{login_school}_{input_id}"
                 
             if user_key in users and users[user_key]["password"] == input_pw:
                 st.session_state.logged_in = True
@@ -309,8 +307,7 @@ else:
                     "school": users[user_key]["school"], "class_group": users[user_key].get("class_group", "미배정")
                 }
                 st.rerun()
-            else: 
-                st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
+            else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
 # --- [5] 화면 분기 로직 ---
 if not st.session_state.logged_in:
