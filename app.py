@@ -208,10 +208,10 @@ else:
         st.sidebar.subheader("📝 회원가입")
         
         # [수정됨] 회원가입 폼 순서 완벽 조정 (자격 - 학교 - 학번 - 이름 - 비번)
-        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사", "관리자"])
+        reg_role = st.sidebar.selectbox("유형", ["학생", "교사", "관리자"])
         reg_school = st.sidebar.text_input("소속 학교")
-        reg_id = st.sidebar.text_input("학번입력")
-        reg_name = st.sidebar.text_input("이름 입력")
+        reg_id = st.sidebar.text_input("학번")
+        reg_name = st.sidebar.text_input("이름")
         reg_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("가입 신청", use_container_width=True):
