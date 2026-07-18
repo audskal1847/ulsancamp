@@ -150,9 +150,9 @@ def render_camp_overview(current_role):
 
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 호계고 모둠 구성 및 사전 안내"):
-            st.markdown("[🔗 호계고 모둠 구성 확인하기 (구글 문서)](#)")
-            st.markdown("[🔗 호계고 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
+        with st.expander("👥 모둠 구성 및 사전 안내"):
+            st.markdown("[🔗 모둠 구성 확인하기 (구글 문서)](#)")
+            st.markdown("[🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
 
         with st.expander("📝 활동지 링크 (클릭 시 제출 화면으로 이동)"):
             st.caption("아래 버튼을 누르면 해당 활동지 제출 양식으로 화면이 전환됩니다.")
