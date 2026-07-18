@@ -203,7 +203,8 @@ def render_camp_overview(current_role):
             st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
             st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
 
-        with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)"):
+        # 💡 [요청사항 반영] 활동지 링크 메뉴를 기본으로 펼쳐지도록 expanded=True 추가
+        with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
                 if st.button(f"📄 {act}", use_container_width=True):
@@ -365,7 +366,6 @@ else:
                     "이름": info.get("name", "이름없음"), "권한": info.get("role", "-"), 
                     "반": info.get("class_group", "-"), "비밀번호": info.get("password", "-")
                 } for uid, info in all_users.items()])
-                
                 st.dataframe(df_users, use_container_width=True)
 
                 if current_role == "관리자":
@@ -488,7 +488,7 @@ else:
                         if selected_student:
                             student_answers = learning_data.get(selected_student, {})
                             
-                            # 💡 [핵심 추가 2] 특정 학생 전체 포트폴리오 텍스트 추출 및 다운로드 버튼 생성
+                            # 💡 [요청사항 반영] 특정 학생 포트폴리오 다운로드 버튼 추가
                             report_content = f"[{all_users[selected_student].get('school', '')}] {all_users[selected_student].get('class_group', '')} {all_users[selected_student].get('name', '')} ({all_users[selected_student].get('id', '')}) 학습 포트폴리오\n\n"
                             report_content += "==== [1] 활동지 작성 내역 ====\n\n"
                             
@@ -522,7 +522,7 @@ else:
                                         if ans.get("text"): report_content += f"📝 텍스트: {ans['text']}\n"
                                         if ans.get("link"): report_content += f"🔗 링크: {ans['link']}\n"
                                         report_content += "\n"
-                                        
+                            
                             st.download_button(
                                 label=f"📄 {all_users[selected_student].get('name', '학생')}의 전체 활동 데이터 텍스트(.txt) 파일로 다운로드",
                                 data=report_content,
@@ -575,45 +575,47 @@ else:
                         combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
                         selected_view = st.selectbox("다운로드할 데이터 범주를 선택하세요", combined_list)
                         
-                        # 💡 [핵심 추가 1] 활동지1의 표 데이터를 모두 Flatten(가로로 전개) 처리하여 출력
+                        # 💡 [요청사항 반영] 전체 현황 화면 및 엑셀 출력 형식을 원래 표 양식(세로형)으로 변환
                         if selected_view == "[활동지1] 진학 희망 학과 조사하기":
-                            q_summary_data = []
+                            st.info("💡 아래 화면은 입력 형식 그대로 렌더링된 모습이며, 하단의 엑셀 다운로드 버튼을 누르면 세로 형식의 데이터로 깔끔하게 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
+                            
+                            # 엑셀 다운로드를 위한 세로 정렬 데이터 생성
+                            csv_data = []
                             for s_uid in student_list:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {})
-                                df1_data = ans.get("df1", [])
-                                df2_data = ans.get("df2", [])
+                                u_info = all_users[s_uid]
                                 
-                                row_data = {
-                                    "학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"),
-                                    "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid].get("name", "")
-                                }
+                                # 화면 출력: 학생별로 분리해서 오리지널 표 렌더링
+                                st.markdown(f"#### 👤 [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})")
+                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**")
+                                st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
+                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**")
+                                st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
+                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**")
+                                st.info(ans.get("step3", "-"))
+                                st.markdown("---")
                                 
-                                # 1단계(df1) 데이터 전개 (4줄)
-                                for i in range(4):
-                                    if i < len(df1_data):
-                                        row_data[f"[1단계] 전공명{i+1}"] = df1_data[i].get("학과/전공명", "")
-                                        row_data[f"[1단계] 핵심요소{i+1}"] = df1_data[i].get("핵심 내용 요소", "")
-                                    else:
-                                        row_data[f"[1단계] 전공명{i+1}"] = ""
-                                        row_data[f"[1단계] 핵심요소{i+1}"] = ""
-                                        
-                                # 2단계(df2) 데이터 전개 (탐구키워드, 창체, 세특)
-                                labels = ["탐구키워드", "창체활동", "교과세특"]
-                                for i, label in enumerate(labels):
-                                    if i < len(df2_data):
-                                        for k in range(1, 6):
-                                            row_data[f"[2단계] {label}_{k}"] = df2_data[i].get(f"키워드{k}", "")
-                                    else:
-                                        for k in range(1, 6):
-                                            row_data[f"[2단계] {label}_{k}"] = ""
-                                            
-                                # 3단계 텍스트 추가
-                                row_data["[3단계] 탐구주제"] = ans.get("step3", "")
-                                q_summary_data.append(row_data)
+                                # 엑셀 출력: 세로 스태킹 알고리즘
+                                csv_data.append([f"■ [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})", "", "", "", "", ""])
+                                csv_data.append(["[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기", "", "", "", "", ""])
+                                csv_data.append(["학과/전공명", "핵심 내용 요소", "", "", "", ""])
+                                for row in ans.get("df1", []):
+                                    csv_data.append([row.get("학과/전공명", ""), row.get("핵심 내용 요소", ""), "", "", "", ""])
+                                csv_data.append(["", "", "", "", "", ""])
                                 
-                            df_q = pd.DataFrame(q_summary_data)
-                            st.dataframe(df_q, use_container_width=True, hide_index=True)
-                            st.download_button(f"📊 활동지1 상세 데이터 엑셀 다운로드 ({filter_class})", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"활동지1_상세_{filter_class}_결과.csv", mime='text/csv')
+                                csv_data.append(["[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기", "", "", "", "", ""])
+                                csv_data.append(["구분", "키워드1", "키워드2", "키워드3", "키워드4", "키워드5"])
+                                for row in ans.get("df2", []):
+                                    csv_data.append([row.get("구분", ""), row.get("키워드1", ""), row.get("키워드2", ""), row.get("키워드3", ""), row.get("키워드4", ""), row.get("키워드5", "")])
+                                csv_data.append(["", "", "", "", "", ""])
+                                
+                                csv_data.append(["[3단계] 이번 특강을 통해 탐구하고 싶은 내용 영역 또는 문제 인식", "", "", "", "", ""])
+                                csv_data.append([ans.get("step3", ""), "", "", "", "", ""])
+                                csv_data.append(["==================================================", "", "", "", "", ""])
+                                csv_data.append(["", "", "", "", "", ""])
+                                
+                            df_csv = pd.DataFrame(csv_data)
+                            st.download_button(f"📊 활동지1 원본 폼 형식 엑셀 다운로드 ({filter_class})", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"활동지1_원본포맷_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view in ACTIVITIES:
                             q_summary_data = []
