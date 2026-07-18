@@ -172,10 +172,6 @@ def render_camp_overview(current_role):
             st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
             qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
             
-            if os.path.exists(qr_image):
-                st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
-            else:
-                st.info("💡 현재 폴더에 'image (11).png' 파일이 없습니다. 폴더에 이미지를 넣으면 QR코드가 나타납니다.")
 
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
