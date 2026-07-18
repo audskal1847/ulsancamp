@@ -149,9 +149,11 @@ def render_camp_overview(current_role):
 
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 모둠 구성 및 사전 안내"):
-            st.markdown("[🔗 모둠 구성 확인하기 (구글 문서)](#)")
-            st.markdown("[🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
+        # 요구사항 반영: 구글 폼 설문조사 링크 추가 완료
+        with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
+            st.markdown("- [🔗 모둠 구성 확인하기 (구글 문서)](#)")
+            st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
+            st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
 
         with st.expander("📝 활동지 링크 (클릭 시 제출 화면으로 이동)"):
             st.caption("아래 버튼을 누르면 해당 활동지 제출 양식으로 화면이 전환됩니다.")
@@ -159,27 +161,16 @@ def render_camp_overview(current_role):
                 if st.button(f"📄 {act}", use_container_width=True):
                     st.session_state.current_page = act
                     st.rerun()
-            st.markdown("---")
-            st.markdown("[🔗 [참고] 사전 설문 조사 (구글 폼)](#)")
             
     with col2:
-        with st.expander("📚 대학 전공 가이드북 링크"):
-            st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](#)")
+        # 요구사항 반영: 구글 드라이브 실제 폴더 링크 연동 완료
+        with st.expander("📚 대학 전공 가이드북 링크", expanded=True):
+            st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
 
-        with st.expander("🔍 교과 키워드 추출 링크"):
-            st.markdown("- 📗 `[고3] 2015 선택과목 안내서.pdf` (49.1 MiB)\n- 📘 `[고1,2] 2022 선택과목 안내서.pdf` (21.8 MiB)")
-
-        with st.expander("🌐 자료 탐색 사이트 목록"):
-            st.markdown("- ▶ 검색 엔진\n- ▶ 대학 웹사이트 (연구 소개)\n- ▶ 논문 사이트\n- ▶ 포털\n- ▶ 분야별 간행지\n- ▶ 영상 자료")
-
-        with st.expander("📁 차시별 강의 pdf"):
-            st.markdown("[🔗 차시별 강의 PDF 드라이브 모음 열기](#)")
-
+        # 요구사항 반영: 교과 키워드, 자료 탐색 목록, 차시별 강의 섹션 삭제 완료
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
             st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
-            
-            # 💡 [핵심 수정] 터미널 실행 경로 분리 현상을 막기 위해 app.py 기준으로 절대 경로 동기화 적용
-            qr_image = os.path.join(os.path.dirname(__file__), "qr code.png")
+            qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
             
             if os.path.exists(qr_image):
                 st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
@@ -194,7 +185,11 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.user_info = None
 if "current_page" not in st.session_state:
-    st.session_state.current_page = "메인"
+    st.session_state.current_page = "main" # 일관성을 위해 소문자로 기본값 매핑
+
+# 세션이 '메인' 한글로 남아있을 경우 소문자로 자동 동기화 보정
+if st.session_state.current_page == "메인":
+    st.session_state.current_page = "main"
 
 st.sidebar.title("🔒 인증 센터")
 if st.session_state.logged_in:
@@ -202,12 +197,13 @@ if st.session_state.logged_in:
     st.sidebar.success(f"🟢 {u_info['name']} 님 로그인 중")
     st.sidebar.write(f"🏫 소속: {u_info['school']} | 🛡️ {u_info['role']}")
     if st.sidebar.button("로그아웃", use_container_width=True):
-        st.session_state.logged_in = False; st.session_state.user_info = None; st.session_state.current_page = "메인"; st.rerun()
+        st.session_state.logged_in = False; st.session_state.user_info = None; st.session_state.current_page = "main"; st.rerun()
 else:
     auth_choice = st.sidebar.radio("원하는 작업을 선택하세요", ["회원가입", "로그인"])
     users = load_json(USERS_FILE, {})
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
+        
         reg_role = st.sidebar.selectbox("유형", ["학생", "교사", "관리자"])
         reg_school = st.sidebar.text_input("소속 학교")
         reg_id = st.sidebar.text_input("학번")
@@ -247,12 +243,12 @@ else:
         act_name = st.session_state.current_page
         st.title(f"📄 {act_name}")
         if st.button("⬅️ 메인 화면으로 돌아가기"):
-            st.session_state.current_page = "메인"; st.rerun()
+            st.session_state.current_page = "main"; st.rerun()
         st.markdown("---")
         if current_role == "학생": render_submission_form(current_user, act_name, "content", "아래 입력란에 활동지 결과물을 제출하세요.")
         else: st.warning("교사/관리자는 제출 모니터링 탭을 이용해주세요.")
 
-    elif st.session_state.current_page == "메인":
+    elif st.session_state.current_page == "main":
         # --------- 학생 ---------
         if current_role == "학생":
             tabs_list = ["📌 캠프 공지 및 자료실"] + app_config["tabs"]
@@ -336,7 +332,7 @@ else:
                     
                     st.markdown("---")
                     
-                    st.subheader("⚙️ 차시(Tab) 동적 제어")
+                    st.subheader("⚙️ 차시 설정")
                     col1, col2 = st.columns(2)
                     with col1:
                         st.write("➕ **새로운 학습 차시 추가**")
