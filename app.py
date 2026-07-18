@@ -112,7 +112,7 @@ def render_submission_form(user_key, category, q_id, q_label):
             save_json(DATA_FILE, data)
             st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
 
-# --- [3-B] 활동지1 전용 맞춤형 폼 (사용자 키워드 입력 가능표) ---
+# --- [3-B] 활동지1 전용 맞춤형 폼 (이미지 추가 및 키워드 열 이름 변경) ---
 def render_activity1_form(user_key):
     category = "[활동지1] 진학 희망 학과 조사하기"
     data = load_json(DATA_FILE, {})
@@ -129,14 +129,24 @@ def render_activity1_form(user_key):
         st.markdown("---")
         
         st.markdown("#### [2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기")
-        # 💡 데이터 손실 없이 키워드를 자유롭게 적을 수 있는 가장 첫 번째 행(Row) 추가
         st.info("💡 표의 가장 윗줄인 **'✏️ 나의 탐구 키워드'** 행의 빈칸을 더블클릭하여 본인의 키워드를 직접 입력하세요!")
+        
+        # 💡 [핵심 수정] 요소1~5를 키워드1~5로 변경 완료
         default_df2 = pd.DataFrame({
             "구분": ["✏️ 나의 탐구 키워드", "창체활동", "교과세특"],
-            "요소1": ["", "", ""], "요소2": ["", "", ""], "요소3": ["", "", ""], "요소4": ["", "", ""], "요소5": ["", "", ""]
+            "키워드1": ["", "", ""], "키워드2": ["", "", ""], "키워드3": ["", "", ""], "키워드4": ["", "", ""], "키워드5": ["", "", ""]
         })
         df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
         edited_df2 = st.data_editor(df2, use_container_width=True, key="act1_df2")
+        
+        st.markdown("<br>#### [2단계-예시]", unsafe_allow_html=True)
+        # 💡 [핵심 수정] 전달해주신 스크린샷 이미지 출력 코드 추가
+        example_image = os.path.join(os.path.dirname(__file__), "스크린샷 2026-07-18 214218.png")
+        if os.path.exists(example_image):
+            st.image(example_image, caption="희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.", use_container_width=True)
+        else:
+            st.info("💡 [2단계-예시] 희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요. (현재 폴더에 '스크린샷 2026-07-18 214218.png' 파일이 없어 이미지가 표시되지 않습니다.)")
+            
         st.markdown("---")
         
         st.markdown("#### [3단계] 이번 특강을 통해 탐구하고 싶은 내용 영역 또는 문제 인식(주제 찾기)")
