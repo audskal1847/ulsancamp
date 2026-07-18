@@ -179,7 +179,7 @@ def render_camp_overview(current_role):
             st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
             
             # 💡 [핵심 수정] 터미널 실행 경로 분리 현상을 막기 위해 app.py 기준으로 절대 경로 동기화 적용
-            qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
+            qr_image = os.path.join(os.path.dirname(__file__), "qr code.png")
             
             if os.path.exists(qr_image):
                 st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
