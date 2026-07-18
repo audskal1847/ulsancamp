@@ -48,7 +48,6 @@ def init_system():
     users = load_json(USERS_FILE, {})
     updated = False
     for i in range(1, 5):
-        # 💡 [핵심 수정] 시스템 내부 고유 키를 '학교_학번' 조합으로 변경
         admin_id = f"admin{i}"
         user_key = f"호계고등학교_{admin_id}"
         if user_key not in users:
@@ -113,7 +112,7 @@ def render_submission_form(user_key, category, q_id, q_label):
             save_json(DATA_FILE, data)
             st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
 
-# --- [3-B] 활동지1 전용 맞춤형 폼 ---
+# --- [3-B] 활동지1 전용 맞춤형 폼 (사용자 키워드 입력 가능표) ---
 def render_activity1_form(user_key):
     category = "[활동지1] 진학 희망 학과 조사하기"
     data = load_json(DATA_FILE, {})
@@ -130,13 +129,14 @@ def render_activity1_form(user_key):
         st.markdown("---")
         
         st.markdown("#### [2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기")
+        # 💡 데이터 손실 없이 키워드를 자유롭게 적을 수 있는 가장 첫 번째 행(Row) 추가
+        st.info("💡 표의 가장 윗줄인 **'✏️ 나의 탐구 키워드'** 행의 빈칸을 더블클릭하여 본인의 키워드를 직접 입력하세요!")
         default_df2 = pd.DataFrame({
-            "구분": ["창체활동", "교과세특"],
-            "요소1": ["", ""], "요소2": ["", ""], "요소3": ["", ""], "요소4": ["", ""], "요소5": ["", ""]
+            "구분": ["✏️ 나의 탐구 키워드", "창체활동", "교과세특"],
+            "요소1": ["", "", ""], "요소2": ["", "", ""], "요소3": ["", "", ""], "요소4": ["", "", ""], "요소5": ["", "", ""]
         })
         df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
         edited_df2 = st.data_editor(df2, use_container_width=True, key="act1_df2")
-        st.info("💡 [2단계-예시] 희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.")
         st.markdown("---")
         
         st.markdown("#### [3단계] 이번 특강을 통해 탐구하고 싶은 내용 영역 또는 문제 인식(주제 찾기)")
@@ -254,7 +254,6 @@ else:
         
         if st.sidebar.button("가입 신청", use_container_width=True):
             if reg_role and reg_school and reg_id and reg_pw and reg_name:
-                # 💡 [핵심 수정] 가입 시 '학교명_학번'을 고유 키로 사용하여 동일 학번 충돌 방지
                 user_key = f"{reg_school}_{reg_id}"
                 if user_key in users: st.sidebar.error("❌ 해당 학교에 이미 동일한 학번/ID가 존재합니다.")
                 else:
@@ -263,7 +262,6 @@ else:
             else: st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
-        # 💡 [핵심 수정] 로그인 시 학교를 먼저 기입하게 하여 중복 학번 방지 구조 완성
         login_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
         input_id = st.sidebar.text_input("학번/ID")
         input_pw = st.sidebar.text_input("비밀번호", type="password")
@@ -287,12 +285,10 @@ if not st.session_state.logged_in:
 
 else:
     current_role = st.session_state.user_info["role"]
-    # 내부 데이터 저장 키는 이제 고유값인 user_key(학교명_학번)를 사용합니다.
     current_user_key = st.session_state.user_info["user_key"]
     app_config = load_json(CONFIG_FILE, {})
     learning_data = load_json(DATA_FILE, {})
 
-    # [화면 A] 활동지 개별 입력 화면
     if st.session_state.current_page in ACTIVITIES:
         act_name = st.session_state.current_page
         st.title(f"📄 {act_name}")
@@ -333,7 +329,6 @@ else:
 
             with menu_tabs[1]:
                 all_users = load_json(USERS_FILE, {})
-                # 표에 학교명 열쇠를 풀어서 출력
                 st.dataframe(pd.DataFrame([{"학교": info["school"], "학번": info.get("id", uid.split('_')[-1]), "이름": info["name"], "권한": info["role"], "반": info.get("class_group", "-")} for uid, info in all_users.items()]), use_container_width=True)
 
             if current_role == "관리자":
@@ -357,7 +352,6 @@ else:
                     st.markdown("---")
                     
                     if view_mode == "👤 특정 학생 집중 분석":
-                        # 식별의 명확성을 위해 [학교명]을 함께 표시
                         selected_student = st.selectbox("학생 선택", student_list, format_func=lambda x: f"[{all_users[x].get('class_group', '-')}] {all_users[x]['school']} {all_users[x]['name']} ({all_users[x].get('id', x.split('_')[-1])})")
                         if selected_student:
                             student_answers = learning_data.get(selected_student, {})
