@@ -47,12 +47,24 @@ def save_json(file_path, data):
 def init_system():
     users = load_json(USERS_FILE, {})
     updated = False
-    for i in range(1, 5):
-        admin_id = f"admin{i}"
-        user_key = f"호계고등학교_{admin_id}"
-        if user_key not in users:
-            users[user_key] = {"id": admin_id, "password": "admin123", "name": f"관리자{i}", "role": "관리자", "school": "호계고등학교", "class_group": "관리자"}
+    
+    # 💡 [핵심 수정] 4명의 지정된 관리자 계정 하드코딩
+    admins = {
+        "admin1": "admin11",
+        "admin2": "admin22",
+        "admin3": "admin33",
+        "admin4": "admin44"
+    }
+    
+    for a_id, a_pw in admins.items():
+        if a_id not in users:
+            # 관리자는 학교명 결합 없이 ID 자체를 고유 키로 사용합니다.
+            users[a_id] = {
+                "id": a_id, "password": a_pw, "name": f"총괄운영자({a_id})", 
+                "role": "관리자", "school": "운영본부", "class_group": "관리자"
+            }
             updated = True
+            
     if updated: save_json(USERS_FILE, users)
     
     load_json(DATA_FILE, {})
@@ -112,7 +124,7 @@ def render_submission_form(user_key, category, q_id, q_label):
             save_json(DATA_FILE, data)
             st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
 
-# --- [3-B] 활동지1 전용 맞춤형 폼 (이미지 추가 및 키워드 열 이름 변경) ---
+# --- [3-B] 활동지1 전용 맞춤형 폼 ---
 def render_activity1_form(user_key):
     category = "[활동지1] 진학 희망 학과 조사하기"
     data = load_json(DATA_FILE, {})
@@ -131,7 +143,6 @@ def render_activity1_form(user_key):
         st.markdown("#### [2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기")
         st.info("💡 표의 가장 윗줄인 **'✏️ 나의 탐구 키워드'** 행의 빈칸을 더블클릭하여 본인의 키워드를 직접 입력하세요!")
         
-        # 💡 [핵심 수정] 요소1~5를 키워드1~5로 변경 완료
         default_df2 = pd.DataFrame({
             "구분": ["✏️ 나의 탐구 키워드", "창체활동", "교과세특"],
             "키워드1": ["", "", ""], "키워드2": ["", "", ""], "키워드3": ["", "", ""], "키워드4": ["", "", ""], "키워드5": ["", "", ""]
@@ -140,10 +151,7 @@ def render_activity1_form(user_key):
         edited_df2 = st.data_editor(df2, use_container_width=True, key="act1_df2")
         
         st.markdown("<br>#### [2단계-예시]", unsafe_allow_html=True)
-        
-        # 💡 파일명을 단순한 영어(example.png)로 변경하여 인식 오류를 원천 차단합니다.
-        example_image = "example.png"
-        
+        example_image = os.path.join(os.path.dirname(__file__), "example.png")
         if os.path.exists(example_image):
             st.image(example_image, caption="희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.", use_container_width=True)
         else:
@@ -255,9 +263,10 @@ else:
     
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
-        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사", "관리자"])
+        # 💡 [보안 수정] 회원가입에서 '관리자' 옵션 삭제 (관리자는 하드코딩된 4개 계정만 사용)
+        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
         if reg_role == "학생": reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
-        else: reg_class = "관리자"
+        else: reg_class = "교사"
             
         reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
         reg_id = st.sidebar.text_input("학번/ID 입력")
@@ -274,12 +283,24 @@ else:
             else: st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
-        login_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
-        input_id = st.sidebar.text_input("학번/ID")
+        # 💡 [핵심 수정] 로그인 시 관리자와 일반 사용자 분리
+        login_type = st.sidebar.radio("로그인 계정 유형", ["학생 및 교사", "관리자"])
+        
+        if login_type == "학생 및 교사":
+            login_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
+            input_id = st.sidebar.text_input("학번/ID")
+        else:
+            login_school = "운영본부" # 관리자는 내부적으로 운영본부 소속으로 처리
+            input_id = st.sidebar.text_input("관리자 ID (예: admin1)")
+            
         input_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("로그인", use_container_width=True):
-            user_key = f"{login_school}_{input_id}"
+            if login_type == "관리자":
+                user_key = input_id # 관리자는 ID가 곧 키값
+            else:
+                user_key = f"{login_school}_{input_id}" # 학생/교사는 학교+학번이 키값
+                
             if user_key in users and users[user_key]["password"] == input_pw:
                 st.session_state.logged_in = True
                 st.session_state.user_info = {
@@ -288,7 +309,8 @@ else:
                     "school": users[user_key]["school"], "class_group": users[user_key].get("class_group", "미배정")
                 }
                 st.rerun()
-            else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
+            else: 
+                st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
 # --- [5] 화면 분기 로직 ---
 if not st.session_state.logged_in:
