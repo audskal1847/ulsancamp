@@ -238,9 +238,9 @@ if st.session_state.logged_in:
     st.sidebar.success(f"🟢 {u_info['name']} 님 로그인 중")
     display_class = u_info.get('class_group', '')
     if display_class and display_class != "관리자":
-        st.sidebar.write(f"🏫 소속: {u_info['school']} ({display_class})")
+        st.sidebar.write(f"🏫 소속: {u_info.get('school', '소속없음')} ({display_class})")
     else:
-        st.sidebar.write(f"🏫 소속: {u_info['school']}")
+        st.sidebar.write(f"🏫 소속: {u_info.get('school', '소속없음')}")
     st.sidebar.write(f"🛡️ 권한: {u_info['role']}")
     if st.sidebar.button("로그아웃", use_container_width=True):
         st.session_state.logged_in = False; st.session_state.user_info = None; st.session_state.current_page = "main"; st.rerun()
@@ -295,12 +295,12 @@ else:
             else:
                 user_key = f"{login_school}_{input_id}" if login_type == "학생" else f"teacher_{input_id}"
                 
-                if user_key in users and users[user_key]["password"] == input_pw:
-                    if users[user_key]["role"] == login_type:
+                if user_key in users and users[user_key].get("password") == input_pw:
+                    if users[user_key].get("role") == login_type:
                         st.session_state.logged_in = True
                         st.session_state.user_info = {
                             "user_key": user_key, "username": users[user_key].get("id", input_id), 
-                            "name": users[user_key]["name"], "role": users[user_key]["role"], 
+                            "name": users[user_key].get("name", "이름없음"), "role": users[user_key].get("role", login_type), 
                             "school": users[user_key].get("school", "소속없음"), "class_group": users[user_key].get("class_group", "미배정")
                         }
                         st.rerun()
@@ -356,19 +356,17 @@ else:
             
             with menu_tabs[0]: render_camp_overview(current_role)
 
-            # 💡 [핵심 복구 1] 회원 관리 기능 완벽 구현 (비밀번호 노출 및 삭제/변경 기능)
             with menu_tabs[1]:
                 st.subheader("👥 가입 회원 목록 및 관리")
                 all_users = load_json(USERS_FILE, {})
                 
-                # 표에 비밀번호 포함하여 출력
                 df_users = pd.DataFrame([{
                     "학교": info.get("school", "-"), 
                     "학번/ID": info.get("id", uid.split('_')[-1]), 
-                    "이름": info["name"], 
-                    "권한": info["role"], 
+                    "이름": info.get("name", "이름없음"), 
+                    "권한": info.get("role", "-"), 
                     "반": info.get("class_group", "-"),
-                    "비밀번호": info.get("password", "")
+                    "비밀번호": info.get("password", "-")
                 } for uid, info in all_users.items()])
                 
                 st.dataframe(df_users, use_container_width=True)
@@ -378,14 +376,14 @@ else:
                     st.subheader("⚙️ 개별 회원 제어")
                     col1, col2 = st.columns(2)
                     
-                    # 최고 관리자 계정을 제외한 목록 생성 (삭제/수정 방지)
                     editable_users = [u for u in all_users.keys() if u not in ADMIN_ACCOUNTS]
                     
+                    # 💡 [핵심 방어 로직] get() 함수를 사용하여 과거 데이터의 키에러 완벽 방지
                     with col1:
                         st.write("❌ **회원 강제 탈퇴(삭제)**")
-                        delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x]['school']}] {all_users[x]['name']} ({all_users[x]['id']})")
+                        delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if delete_target != "선택":
-                            if st.button(f"⚠️ {all_users[delete_target]['name']} 회원 데이터 영구 삭제", type="primary"):
+                            if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제", type="primary"):
                                 del all_users[delete_target]
                                 save_json(USERS_FILE, all_users)
                                 st.success("삭제 완료")
@@ -393,7 +391,7 @@ else:
 
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
-                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x]['school']}] {all_users[x]['name']} ({all_users[x]['id']})")
+                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         new_pw = st.text_input("새로운 비밀번호 입력", type="password")
                         if pw_target != "선택":
                             if st.button("비밀번호 변경 적용"):
@@ -405,7 +403,6 @@ else:
                                 else:
                                     st.error("새 비밀번호를 입력해주세요.")
 
-            # 💡 [핵심 복구 2] 차시 및 자료 편집 전체 기능 원상 복구
             if current_role == "관리자":
                 with menu_tabs[2]:
                     st.subheader("👨‍🏫 교사용 특강 자료 업로드 (PPT, PDF, 외부 링크)")
@@ -442,7 +439,7 @@ else:
                     current_materials = app_config.get("materials", [])
                     if current_materials:
                         st.write("🗑️ **등록된 강의 자료 삭제**")
-                        del_mat_target = st.selectbox("삭제할 자료를 선택하세요", options=current_materials, format_func=lambda x: x["title"])
+                        del_mat_target = st.selectbox("삭제할 자료를 선택하세요", options=current_materials, format_func=lambda x: x.get("title", "제목없음"))
                         if st.button("선택한 자료 삭제하기"):
                             app_config["materials"].remove(del_mat_target)
                             save_json(CONFIG_FILE, app_config); st.success("삭제 완료!"); st.rerun()
@@ -473,7 +470,7 @@ else:
                     target_q_tab = st.selectbox("문항을 편집할 차시 선택", app_config["tabs"])
                     if target_q_tab:
                         current_qs = app_config["questions"].get(target_q_tab, [])
-                        for q in current_qs: st.text(f" - [{q['id']}] {q['label']}")
+                        for q in current_qs: st.text(f" - [{q['id']}] {q.get('label', '')}")
                         q_col1, q_col2 = st.columns(2)
                         with q_col1:
                             add_q_label = st.text_input("질문 설명(라벨) 문구 입력")
@@ -484,7 +481,7 @@ else:
                                 save_json(CONFIG_FILE, app_config); st.success("문항 추가 완료."); st.rerun()
                         with q_col2:
                             if current_qs:
-                                del_q_target = st.selectbox("삭제할 문항을 고르세요", options=current_qs, format_func=lambda x: x["label"])
+                                del_q_target = st.selectbox("삭제할 문항을 고르세요", options=current_qs, format_func=lambda x: x.get("label", ""))
                                 if st.button("선택한 문항 삭제", type="primary"):
                                     current_qs.remove(del_q_target); app_config["questions"][target_q_tab] = current_qs
                                     save_json(CONFIG_FILE, app_config); st.success("삭제 완료."); st.rerun()
@@ -496,7 +493,7 @@ else:
                 
                 student_list = []
                 for uid, info in all_users.items():
-                    if info["role"] == "학생":
+                    if info.get("role") == "학생":
                         s_class = info.get("class_group", "미배정")
                         if filter_class == "전체 보기" or filter_class == s_class:
                             student_list.append(uid)
@@ -507,7 +504,8 @@ else:
                     st.markdown("---")
                     
                     if view_mode == "👤 특정 학생 집중 분석":
-                        selected_student = st.selectbox("학생 선택", student_list, format_func=lambda x: f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('school', '-')} {all_users[x]['name']} ({all_users[x].get('id', x.split('_')[-1])})")
+                        # 💡 [핵심 방어 로직] get() 함수를 사용하여 과거 데이터의 키에러 완벽 방지
+                        selected_student = st.selectbox("학생 선택", student_list, format_func=lambda x: f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('school', '-')} {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if selected_student:
                             student_answers = learning_data.get(selected_student, {})
                             st.markdown("#### 📍 [1] 활동지 작성 내역")
@@ -542,7 +540,7 @@ else:
                                     ans = student_answers.get(t_name, {}).get(q["id"], {})
                                     if isinstance(ans, str): ans = {"text": ans} 
                                     if ans.get("text") or ans.get("link") or ans.get("file_name"):
-                                        st.markdown(f"**[{t_name}] Q. {q['label']}**")
+                                        st.markdown(f"**[{t_name}] Q. {q.get('label', '')}**")
                                         if ans.get("text"): st.write(f"📝 {ans['text']}")
                                         if ans.get("link"): st.write(f"🔗 {ans['link']}")
                                         if ans.get("file_path") and os.path.exists(ans['file_path']):
@@ -558,7 +556,7 @@ else:
                             for s_uid in student_list:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {})
                                 q_summary_data.append({
-                                    "학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid]["name"],
+                                    "학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid].get("name", ""),
                                     "3단계 작성 주제": ans.get("step3", "-"), "1단계 입력개수": len(ans.get("df1", [])) if ans.get("df1") else 0, "상세데이터": "개별 학생 분석에서 확인 요망"
                                 })
                             df_q = pd.DataFrame(q_summary_data)
@@ -570,19 +568,19 @@ else:
                             for s_uid in student_list:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {}).get("content", {})
                                 if isinstance(ans, str): ans = {"text": ans}
-                                q_summary_data.append({"학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid]["name"], "입력 텍스트": ans.get("text", "-"), "제출 링크": ans.get("link", "-"), "첨부 파일명": ans.get("file_name", "-")})
+                                q_summary_data.append({"학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid].get("name", ""), "입력 텍스트": ans.get("text", "-"), "제출 링크": ans.get("link", "-"), "첨부 파일명": ans.get("file_name", "-")})
                             df_q = pd.DataFrame(q_summary_data)
                             st.dataframe(df_q, use_container_width=True, hide_index=True)
                             st.download_button(f"📊 엑셀(CSV) 다운로드 ({filter_class})", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"{selected_view}_{filter_class}_결과.csv", mime='text/csv')
                             
                         elif selected_view in app_config["tabs"]:
                             for q in app_config["questions"].get(selected_view, []):
-                                st.markdown(f"##### ❓ {q['label']}")
+                                st.markdown(f"##### ❓ {q.get('label', '')}")
                                 q_summary_data = []
                                 for s_uid in student_list:
                                     ans = learning_data.get(s_uid, {}).get(selected_view, {}).get(q["id"], {})
                                     if isinstance(ans, str): ans = {"text": ans}
-                                    q_summary_data.append({"학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid]["name"], "입력 텍스트": ans.get("text", "-"), "제출 링크": ans.get("link", "-"), "첨부 파일명": ans.get("file_name", "-")})
+                                    q_summary_data.append({"학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid].get("name", ""), "입력 텍스트": ans.get("text", "-"), "제출 링크": ans.get("link", "-"), "첨부 파일명": ans.get("file_name", "-")})
                                 df_q = pd.DataFrame(q_summary_data)
                                 st.dataframe(df_q, use_container_width=True, hide_index=True)
                                 st.download_button(f"📊 문항 데이터 다운로드 ({filter_class})", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"{selected_view}_{filter_class}_결과.csv", mime='text/csv', key=f"csv_{q['id']}")
