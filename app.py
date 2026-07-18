@@ -150,9 +150,9 @@ def render_camp_overview(current_role):
 
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 모둠 구성 및 사전 안내"):
-            st.markdown("[🔗 모둠 구성 확인하기 (구글 문서)](#)")
-            st.markdown("[🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
+        with st.expander("👥 호계고 모둠 구성 및 사전 안내"):
+            st.markdown("[🔗 호계고 모둠 구성 확인하기 (구글 문서)](#)")
+            st.markdown("[🔗 호계고 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
 
         with st.expander("📝 활동지 링크 (클릭 시 제출 화면으로 이동)"):
             st.caption("아래 버튼을 누르면 해당 활동지 제출 양식으로 화면이 전환됩니다.")
@@ -167,7 +167,7 @@ def render_camp_overview(current_role):
         with st.expander("📚 대학 전공 가이드북 링크"):
             st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](#)")
 
-        with st.expander("🔍 교과 키워드 추출 링크"):
+        with st.expander("🔍 교과 키워 추출 링크"):
             st.markdown("- 📗 `[고3] 2015 선택과목 안내서.pdf` (49.1 MiB)\n- 📘 `[고1,2] 2022 선택과목 안내서.pdf` (21.8 MiB)")
 
         with st.expander("🌐 자료 탐색 사이트 목록"):
@@ -178,7 +178,8 @@ def render_camp_overview(current_role):
 
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
             st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
-            qr_image = "image_e1cca7.png"
+            # [수정된 부분] 선생님의 실제 파일명인 "image (11).png"로 매칭했습니다.
+            qr_image = "image (11).png"
             if os.path.exists(qr_image):
                 st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
             else:
@@ -207,11 +208,10 @@ else:
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
         
-        # [수정됨] 회원가입 폼 순서 완벽 조정 (자격 - 학교 - 학번 - 이름 - 비번)
-        reg_role = st.sidebar.selectbox("유형", ["학생", "교사", "관리자"])
-        reg_school = st.sidebar.text_input("소속 학교")
-        reg_id = st.sidebar.text_input("학번")
-        reg_name = st.sidebar.text_input("이름")
+        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사", "관리자"])
+        reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
+        reg_id = st.sidebar.text_input("학번/ID 입력")
+        reg_name = st.sidebar.text_input("이름 입력")
         reg_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("가입 신청", use_container_width=True):
@@ -224,7 +224,7 @@ else:
                 st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
-        input_id = st.sidebar.text_input("학번"); input_pw = st.sidebar.text_input("비밀번호", type="password")
+        input_id = st.sidebar.text_input("학번/ID"); input_pw = st.sidebar.text_input("비밀번호", type="password")
         if st.sidebar.button("로그인", use_container_width=True):
             if input_id in users and users[input_id]["password"] == input_pw:
                 st.session_state.logged_in = True
@@ -259,7 +259,7 @@ else:
             tabs_objects = st.tabs(tabs_list)
             
             with tabs_objects[0]: 
-                render_camp_overview(current_role) # 현재 권한 전달 (학생)
+                render_camp_overview(current_role)
                 
             for index, tab_name in enumerate(app_config["tabs"]):
                 with tabs_objects[index + 1]:
@@ -279,7 +279,7 @@ else:
             
             with menu_tabs[0]:
                 st.info("학생들의 첫 화면(첫 번째 탭)으로 표시되는 메인 대시보드입니다.")
-                render_camp_overview(current_role) # 현재 권한 전달 (관리자/교사)
+                render_camp_overview(current_role)
 
             with menu_tabs[1]:
                 all_users = load_json(USERS_FILE, {})
