@@ -62,7 +62,7 @@ def init_system():
             "1일차_1차시": [{"id": "q1", "label": "탐구 주제 및 목차 설계 (텍스트, 파일, 링크 중 자유 제출)"}],
             "2일차_1차시": [{"id": "q1", "label": "보고서 초안 제출"}]
         },
-        "materials": [] # 교사용 강의 자료(PPT, 링크 등) 저장 공간
+        "materials": [] 
     }
     current_config = load_json(CONFIG_FILE, default_config)
     if "materials" not in current_config:
@@ -110,9 +110,9 @@ def render_submission_form(username, category, q_id, q_label):
             save_json(DATA_FILE, data)
             st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
 
-# --- 캠프 종합 공지 렌더링 (권한별 다운로드 제한 포함) ---
+# --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role):
-    st.header("🎯 [학생-호계고-거점학교] 주제 탐구 캠프 (26-하계방학)")
+    st.header("🎯 [학생-거점학교] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
     
     st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
@@ -131,7 +131,6 @@ def render_camp_overview(current_role):
     st.dataframe(pd.DataFrame(schedule_data, columns=["일자", "차시(시간)", "수업내용", "활동내용"]), use_container_width=True, hide_index=True)
     st.markdown("---")
     
-    # 강사용 PPT 및 링크 자료실 표시 영역 (학생 다운로드 제한 처리)
     app_config = load_json(CONFIG_FILE, {})
     materials = app_config.get("materials", [])
     if materials:
@@ -150,9 +149,9 @@ def render_camp_overview(current_role):
 
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 호계고 모둠 구성 및 사전 안내"):
-            st.markdown("[🔗 호계고 모둠 구성 확인하기 (구글 문서)](#)")
-            st.markdown("[🔗 호계고 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
+        with st.expander("👥 모둠 구성 및 사전 안내"):
+            st.markdown("[🔗 모둠 구성 확인하기 (구글 문서)](#)")
+            st.markdown("[🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
 
         with st.expander("📝 활동지 링크 (클릭 시 제출 화면으로 이동)"):
             st.caption("아래 버튼을 누르면 해당 활동지 제출 양식으로 화면이 전환됩니다.")
@@ -167,7 +166,7 @@ def render_camp_overview(current_role):
         with st.expander("📚 대학 전공 가이드북 링크"):
             st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](#)")
 
-        with st.expander("🔍 교과 키워 추출 링크"):
+        with st.expander("🔍 교과 키워드 추출 링크"):
             st.markdown("- 📗 `[고3] 2015 선택과목 안내서.pdf` (49.1 MiB)\n- 📘 `[고1,2] 2022 선택과목 안내서.pdf` (21.8 MiB)")
 
         with st.expander("🌐 자료 탐색 사이트 목록"):
@@ -178,12 +177,14 @@ def render_camp_overview(current_role):
 
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
             st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
-            # [수정된 부분] 선생님의 실제 파일명인 "image (11).png"로 매칭했습니다.
-            qr_image = "image (11).png"
+            
+            # 💡 [핵심 수정] 터미널 실행 경로 분리 현상을 막기 위해 app.py 기준으로 절대 경로 동기화 적용
+            qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
+            
             if os.path.exists(qr_image):
                 st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
             else:
-                st.info(f"💡 현재 폴더에 '{qr_image}' 파일이 없습니다. 폴더에 이미지를 넣으면 QR코드가 나타납니다.")
+                st.info("💡 현재 폴더에 'image (11).png' 파일이 없습니다. 폴더에 이미지를 넣으면 QR코드가 나타납니다.")
 
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
@@ -207,11 +208,10 @@ else:
     users = load_json(USERS_FILE, {})
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
-        
-        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사", "관리자"])
-        reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
-        reg_id = st.sidebar.text_input("학번/ID 입력")
-        reg_name = st.sidebar.text_input("이름 입력")
+        reg_role = st.sidebar.selectbox("유형", ["학생", "교사", "관리자"])
+        reg_school = st.sidebar.text_input("소속 학교")
+        reg_id = st.sidebar.text_input("학번")
+        reg_name = st.sidebar.text_input("이름")
         reg_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("가입 신청", use_container_width=True):
