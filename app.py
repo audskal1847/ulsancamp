@@ -22,7 +22,6 @@ ADMIN_ACCOUNTS = {
     "admin4": "admin44"
 }
 
-# 💡 [업데이트] 활동지 목록 최종 9개 완벽 세팅
 ACTIVITIES = [
     "[활동지1] 진학 희망 학과 조사하기",
     "[활동지2] 나만의 탐구 설계하기",
@@ -190,7 +189,6 @@ def render_activity2_form(user_key):
             }
             save_json(DATA_FILE, data); st.toast("🎉 활동지2가 성공적으로 저장되었습니다!")
 
-# 💡 [새로운 맞춤형 폼 모음] 활동지 3, 6, 7 (피드백 보완 공통 폼)
 def render_feedback_form(user_key, category, rows):
     data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
     with st.form(key=f"form_{category}_{user_key}"):
@@ -286,8 +284,7 @@ def render_activity5_form(user_key):
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {
-                "is_custom_act5": True,
-                "info_course": info_course, "info_date": info_date, "info_school": info_school, "info_career": info_career,
+                "is_custom_act5": True, "info_course": info_course, "info_date": info_date, "info_school": info_school, "info_career": info_career,
                 "info_name": info_name, "info_subject": info_subject, "info_method": info_method, "info_topic": info_topic,
                 "topic_title": topic_title, "motive_1": motive_1, "motive_2": motive_2, "purpose": purpose,
                 "bg_df": edited_bg_df.to_dict('records'), "selected_methods": selected_methods, "proc_df": edited_proc_df.to_dict('records'),
@@ -341,11 +338,36 @@ def render_activity9_form(user_key):
             data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
             save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
 
+def render_submission_form(user_key, category, q_id, q_label):
+    data = load_json(DATA_FILE, {})
+    ans = data.get(user_key, {}).get(category, {}).get(q_id, {})
+    if isinstance(ans, str): ans = {"text": ans, "link": "", "file_name": "", "file_path": ""}
+        
+    with st.form(key=f"form_{user_key}_{category}_{q_id}"):
+        st.markdown(f"**{q_label}**")
+        st.caption("텍스트 입력, 외부 링크 주소, 파일 첨부 중 원하는 방식을 하나 이상 선택하여 제출하세요.")
+        text_val = st.text_area("📝 텍스트 내용 작성", value=ans.get("text", ""), height=150)
+        link_val = st.text_input("🔗 관련 링크(URL) 제출", value=ans.get("link", ""), placeholder="https://...")
+        if ans.get("file_name"): st.info(f"📁 현재 등록된 파일: {ans.get('file_name')}")
+        file_val = st.file_uploader("📂 첨부 파일 업로드 (새 파일을 올리면 기존 파일이 대체됩니다)")
+        
+        if st.form_submit_button("제출 및 저장하기"):
+            if user_key not in data: data[user_key] = {}
+            if category not in data[user_key]: data[user_key][category] = {}
+            new_data = {"text": text_val, "link": link_val, "file_path": ans.get("file_path", ""), "file_name": ans.get("file_name", "")}
+            if file_val is not None:
+                safe_filename = f"{user_key}_{category}_{q_id}_{file_val.name}".replace("/", "_").replace("\\", "_")
+                file_path = os.path.join(UPLOAD_DIR, safe_filename)
+                with open(file_path, "wb") as f: f.write(file_val.getvalue())
+                new_data["file_path"] = file_path; new_data["file_name"] = file_val.name
+            data[user_key][category][q_id] = new_data
+            save_json(DATA_FILE, data)
+            st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
+
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role):
     st.header("🎯 [학생-호계고-거점학교] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
-    
     st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
     schedule_data = [
         ["1일차", "1 (09:00~10:40)", "학생부 종합 전형과 탐구 역량의 이해", "우수 기록 사례 분석 및 인공지능 탐색 툴 활용법 익히기"],
@@ -371,8 +393,7 @@ def render_camp_overview(current_role):
             elif mat["type"] == "file":
                 if os.path.exists(mat["content"]):
                     if current_role in ["관리자", "교사"]:
-                        with open(mat["content"], "rb") as f:
-                            st.download_button(f"📥 {mat['title']} ({mat['filename']}) 다운로드", f, file_name=mat['filename'], key=f"mat_dl_{mat['id']}")
+                        with open(mat["content"], "rb") as f: st.download_button(f"📥 {mat['title']} ({mat['filename']}) 다운로드", f, file_name=mat['filename'], key=f"mat_dl_{mat['id']}")
                     else: st.markdown(f"🔒 **{mat['title']}** (학생 다운로드 제한 자료)")
         st.markdown("---")
 
@@ -382,17 +403,14 @@ def render_camp_overview(current_role):
             st.markdown("- [🔗 모둠 구성 확인하기 (구글 문서)](#)")
             st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
             st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
-
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
                 if st.button(f"📄 {act}", use_container_width=True):
                     st.session_state.current_page = act; st.rerun()
-            
     with col2:
         with st.expander("📚 대학 전공 가이드북 링크", expanded=True):
             st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
-
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
             st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
             qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
@@ -400,11 +418,32 @@ def render_camp_overview(current_role):
 
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
+
+# 💡 [핵심 CSS 주입] 표 제목 및 전체 디자인 시인성 대폭 강화
+st.markdown("""
+<style>
+/* 표 렌더링 시 제목 폰트 크기 및 색상 강조 */
+div[data-testid="stDataFrame"] {
+    border: 2px solid #1E3A8A !important;
+    border-radius: 5px;
+}
+[data-testid="stDataFrame"] th, table th {
+    color: #003366 !important;
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    background-color: #E0F2FE !important;
+}
+/* 캔버스용 텍스트 컬러 변수 재정의 */
+:root {
+    --text-color: #002244;
+}
+</style>
+""", unsafe_allow_html=True)
+
 init_system()
 
 if "logged_in" not in st.session_state: st.session_state.logged_in = False; st.session_state.user_info = None
 if "current_page" not in st.session_state: st.session_state.current_page = "main"
-if st.session_state.current_page == "메인": st.session_state.current_page = "main"
 
 st.sidebar.title("🔒 인증 센터")
 if st.session_state.logged_in:
@@ -465,6 +504,10 @@ else:
                     else: st.sidebar.error("❌ 가입하신 계정 유형(학생/교사)이 다릅니다.")
                 else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
+# 💡 [사이드바 푸터] 디자인 및 위치 개선
+st.sidebar.markdown("---")
+st.sidebar.markdown("<div style='text-align: center; color: #666; font-size: 14px;'>🧑‍💻 만든 이: <b>G.E.M.S</b><br>(울산교육청 진학지원단)</div>", unsafe_allow_html=True)
+
 # --- [5] 화면 분기 로직 ---
 if not st.session_state.logged_in:
     st.title("🏫 주제 탐구 캠프 학습 시스템")
@@ -476,11 +519,12 @@ else:
     app_config = load_json(CONFIG_FILE, {})
     learning_data = load_json(DATA_FILE, {})
 
-    # 💡 [라우팅 업데이트] 9개 전체 활동지 연결
     if st.session_state.current_page in ACTIVITIES:
         act_name = st.session_state.current_page
         st.title(f"📄 {act_name}")
-        if st.button("⬅️ 메인 화면으로 돌아가기"):
+        
+        # 💡 [핵심 추가 1] 화면 상단 "메인 화면으로 돌아가기" 버튼 강조
+        if st.button("⬅️ 메인 화면으로 돌아가기", key="btn_back_top", type="primary", use_container_width=True):
             st.session_state.current_page = "main"; st.rerun()
         st.markdown("---")
         
@@ -495,7 +539,12 @@ else:
             elif act_name == ACTIVITIES[7]: render_activity8_form(current_user_key)
             elif act_name == ACTIVITIES[8]: render_activity9_form(current_user_key)
             else: render_submission_form(current_user_key, act_name, "content", f"{act_name} 제출란")
-        else: st.warning("교사/관리자는 제출 모니터링 탭을 이용해주세요.")
+        else: st.warning("교사/관리자는 메인 화면의 '제출 모니터링 탭'을 이용해주세요.")
+        
+        st.markdown("---")
+        # 💡 [핵심 추가 2] 화면 하단 "메인 화면으로 돌아가기" 버튼 강조
+        if st.button("⬅️ 메인 화면으로 돌아가기", key="btn_back_bottom", type="primary", use_container_width=True):
+            st.session_state.current_page = "main"; st.rerun()
 
     elif st.session_state.current_page == "main":
         if current_role == "학생":
@@ -658,7 +707,6 @@ else:
                                 <h2>📑 [1] 활동지 작성 내역</h2>
                             """
                             
-                            # 💡 [HTML 내보내기에 모든 활동지 동적 반영]
                             for act in ACTIVITIES:
                                 ans = student_answers.get(act, {})
                                 if not ans: continue
@@ -738,7 +786,6 @@ else:
                             
                             st.markdown("---")
                             st.markdown("#### 📍 [1] 활동지 작성 내역")
-                            # 💡 [화면 출력에 모든 활동지 동적 반영]
                             for act in ACTIVITIES:
                                 ans = student_answers.get(act, {})
                                 if not ans: continue
@@ -783,8 +830,7 @@ else:
                                         if ans_content.get("text"): st.write(f"📝 {ans_content['text']}")
                                         if ans_content.get("link"): st.write(f"🔗 {ans_content['link']}")
                                         if ans_content.get("file_path") and os.path.exists(ans_content['file_path']):
-                                            with open(ans_content['file_path'], "rb") as f:
-                                                st.download_button("📥 첨부파일 다운로드", f, file_name=ans_content['file_name'], key=f"dl_{selected_student}_{act}")
+                                            with open(ans_content['file_path'], "rb") as f: st.download_button("📥 첨부파일 다운로드", f, file_name=ans_content['file_name'], key=f"dl_{selected_student}_{act}")
                             
                             st.markdown("---")
                             st.markdown("#### 📍 [2] 차시별 제출 자료")
@@ -803,7 +849,6 @@ else:
                         combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
                         selected_view = st.selectbox("다운로드할 데이터 범주를 선택하세요", combined_list)
                         
-                        # 💡 [엑셀 세로형 전개 출력 모든 활동지 동적 반영]
                         if selected_view == ACTIVITIES[0]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
                             csv_data = []
@@ -811,12 +856,9 @@ else:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {})
                                 u_info = all_users[s_uid]
                                 st.markdown(f"#### 👤 [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})")
-                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**")
-                                st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
-                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**")
-                                st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
-                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**")
-                                st.info(ans.get("step3", "-")); st.markdown("---")
+                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**"); st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
+                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**"); st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
+                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**"); st.info(ans.get("step3", "-")); st.markdown("---")
                                 
                                 csv_data.append([f"■ [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})", "", "", "", "", ""])
                                 csv_data.append(["[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기", "", "", "", "", ""])
@@ -965,7 +1007,6 @@ else:
                                 csv_data.append(["나. 웹사이트/기사", ans.get("ref_web", ""), "", ""])
                                 csv_data.append(["==================================================", "", "", ""])
                                 csv_data.append(["", "", "", ""])
-                                
                             df_csv = pd.DataFrame(csv_data)
                             st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
