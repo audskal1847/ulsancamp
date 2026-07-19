@@ -444,9 +444,9 @@ def render_camp_overview(current_role):
                 if st.button(f"📄 {act}", use_container_width=True):
                     st.session_state.current_page = act; st.rerun()
     with col2:
-        with st.expander("📚 대학 전공 가이드북 링크", expanded=True):
-            st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
-        with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
+        with st.expander("📝 대학 전공 가이드북 링크", expanded=True):
+            st.markdown("[ 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
+        with st.expander("📝 만족도 조사 설문 링크 (QR 포함)", expanded=True):
             st.markdown("[캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
             qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
             if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
