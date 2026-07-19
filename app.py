@@ -52,14 +52,18 @@ def init_system():
     users = load_json(USERS_FILE, {})
     load_json(DATA_FILE, {})
     
-    # 💡 [업데이트] 1~8차시 기본 탭 생성 및 3가지 고정 질문 세팅
+    # 💡 [핵심 업데이트] config.json 삭제 시 자동으로 만들어질 8차시 완벽 세팅
     default_tabs = [f"{i}차시" for i in range(1, 9)]
     default_pdfs = {f"{i}차시": f"session{i}.pdf" for i in range(1, 9)}
+    
+    # 3가지 고정 질문 템플릿
     default_questions_template = [
         {"id": "q1", "label": "1. 오늘 배운 핵심 내용을 요약해보세요."},
         {"id": "q2", "label": "2. 이번 차시에서 가장 흥미로웠던 점은 무엇인가요?"},
         {"id": "q3", "label": "3. 질문이나 더 알아보고 싶은 점을 적어주세요."}
     ]
+    
+    # 8개 차시에 동일하게 질문 템플릿 부여
     default_questions = {tab: default_questions_template.copy() for tab in default_tabs}
     
     default_config = {
@@ -600,7 +604,7 @@ else:
                     st.markdown("---")
                     questions = app_config["questions"].get(tab_name, [])
                     
-                    # 💡 [핵심 변경] 차시별 제출 폼을 하나로 통합하고 텍스트 칸만 렌더링
+                    # 💡 [핵심 변경] 차시별 제출 폼을 텍스트 전용으로 바꾸고 하나로 통합 (제출버튼 1개)
                     with st.form(key=f"form_{current_user_key}_{tab_name}"):
                         st.caption("아래 질문들에 대한 답변을 텍스트로 작성한 후, 맨 아래의 [제출 및 저장하기] 버튼을 눌러주세요.")
                         ans_dict = {}
@@ -609,10 +613,11 @@ else:
                             q_label = q["label"]
                             ans_data = learning_data.get(current_user_key, {}).get(tab_name, {}).get(q_id, {})
                             existing_text = ans_data.get("text", "") if isinstance(ans_data, dict) else ans_data
+                            
                             st.markdown(f"**{q_label}**")
                             ans_dict[q_id] = st.text_area("내용 작성", value=existing_text, height=150, key=f"text_{current_user_key}_{tab_name}_{q_id}", label_visibility="collapsed")
                             st.markdown("<br>", unsafe_allow_html=True)
-
+                        
                         if st.form_submit_button("제출 및 저장하기", type="primary"):
                             if current_user_key not in learning_data: learning_data[current_user_key] = {}
                             if tab_name not in learning_data[current_user_key]: learning_data[current_user_key][tab_name] = {}
@@ -641,10 +646,10 @@ else:
                     with col_app1:
                         approve_target = st.selectbox("승인할 회원을 선택하세요", ["선택"] + list(pending_users.keys()), format_func=lambda x: x if x == "선택" else f"[{pending_users[x].get('school', '소속없음')}] {pending_users[x].get('name', '이름없음')} ({pending_users[x].get('id', x.split('_')[-1])})")
                         if approve_target != "선택":
-                            if st.button("✅ 선택한 회원 가입 승인"):
+                            if st.button("✅ 선택한 회원 가입 승인", type="primary"):
                                 all_users[approve_target]["approved"] = True; save_json(USERS_FILE, all_users); st.success("승인 완료!"); st.rerun()
                     with col_app2:
-                        if st.button("✅ 대기 중인 모든 회원 일괄 승인"):
+                        if st.button("✅ 대기 중인 모든 회원 일괄 승인", type="primary"):
                             for uid in pending_users.keys(): all_users[uid]["approved"] = True
                             save_json(USERS_FILE, all_users); st.success("일괄 승인 완료!"); st.rerun()
                 else: st.info("가입 승인을 대기 중인 회원이 없습니다.")
@@ -858,10 +863,9 @@ else:
                                 for q in app_config["questions"].get(t_name, []):
                                     ans = student_answers.get(t_name, {}).get(q["id"], {})
                                     if isinstance(ans, str): ans = {"text": ans} 
-                                    if ans.get("text") or ans.get("link"):
+                                    if ans.get("text"):
                                         html_content += f"<h3>▶ [{t_name}] {q.get('label', '')}</h3>"
-                                        if ans.get("text"): html_content += f"<b>[텍스트 작성 내용]</b><div class='content-box'>{ans['text']}</div>"
-                                        if ans.get("link"): html_content += f"<b>[제출 링크]</b> <a href='{ans['link']}' target='_blank' class='link-text'>{ans['link']}</a><br><br>"
+                                        html_content += f"<div class='content-box'>{ans['text']}</div>"
 
                             html_content += "</body></html>"
                             st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')}의 포트폴리오 다운로드 (웹문서/PDF 변환용)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.html", mime="text/html", type="primary")
@@ -920,10 +924,10 @@ else:
                                 for q in app_config["questions"].get(t_name, []):
                                     ans = student_answers.get(t_name, {}).get(q["id"], {})
                                     if isinstance(ans, str): ans = {"text": ans} 
-                                    if ans.get("text") or ans.get("link"):
-                                        st.markdown(f"**[{t_name}] Q. {q.get('label', '')}**")
-                                        if ans.get("text"): st.write(f"📝 {ans['text']}")
-                                        if ans.get("link"): st.write(f"🔗 {ans['link']}")
+                                    if ans.get("text"):
+                                        st.markdown(f"**[{t_name}] {q.get('label', '')}**")
+                                        st.write(f"📝 {ans['text']}")
+                                        st.markdown("<br>", unsafe_allow_html=True)
 
                     elif view_mode == "📅 항목별(활동지/차시) 전체 현황 (엑셀 다운로드)":
                         combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
