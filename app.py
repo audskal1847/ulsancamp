@@ -435,9 +435,9 @@ def render_camp_overview(current_role):
     col1, col2 = st.columns(2)
     with col1:
         with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
-            st.markdown("- [🔗 모둠 구성 확인하기 (구글 문서)](#)")
-            st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
-            st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
+            st.markdown("- [모둠 구성 확인하기 (구글 문서)](#)")
+            st.markdown("- [ 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
+            st.markdown("- [사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
@@ -447,7 +447,7 @@ def render_camp_overview(current_role):
         with st.expander("📚 대학 전공 가이드북 링크", expanded=True):
             st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
-            st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
+            st.markdown("[캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
             qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
             if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
 
