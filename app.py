@@ -100,7 +100,8 @@ def render_activity1_form(user_key):
         st.markdown("<div style='background-color: #fff9e6; padding: 10px; border-radius: 5px;'>내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?</div>", unsafe_allow_html=True)
         step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
-        if st.form_submit_button("활동지 최종 제출 및 저장"):
+        # 💡 [핵심 반영] 제출 버튼에 명시적인 type="primary" 부여하여 색상 적용
+        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'), "step3": step3_val}
             save_json(DATA_FILE, data); st.toast("🎉 활동지1이 성공적으로 저장되었습니다!")
@@ -181,7 +182,7 @@ def render_activity2_form(user_key):
         with col6: step7_s3 = st.text_input("밝힐점", value=ans.get("step7_s3", ""), label_visibility="collapsed")
         with col7: st.write(")을(를) 밝히려 한다.")
 
-        if st.form_submit_button("활동지 최종 제출 및 저장"):
+        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {
                 "is_custom_act2": True, "step1_1": step1_1, "step1_2": step1_2,
@@ -200,7 +201,7 @@ def render_feedback_form(user_key, category, rows):
         default_df = pd.DataFrame([{"구분": r, "피드백 내용 (구체적으로)": "", "보완 및 수정 계획": ""} for r in rows])
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
         edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["구분"], key=f"df_{category}")
-        if st.form_submit_button("활동지 최종 제출 및 저장"):
+        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom_feedback": True, "df1": edited_df.to_dict('records')}
             save_json(DATA_FILE, data); st.toast(f"🎉 {category} 저장 완료!")
@@ -217,7 +218,7 @@ def render_activity4_form(user_key):
         default_df = pd.DataFrame([{"사이트명": "", "제목": "", "내용": "", "선정이유": ""} for _ in range(5)])
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
         edited_df = st.data_editor(df, num_rows="dynamic", hide_index=True, use_container_width=True, key=f"df_{category}")
-        if st.form_submit_button("활동지 최종 제출 및 저장"):
+        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom_refs": True, "df1": edited_df.to_dict('records')}
             save_json(DATA_FILE, data); st.toast("🎉 저장 완료!")
@@ -287,7 +288,7 @@ def render_activity5_form(user_key):
         st.markdown("**나. 웹사이트/기사**")
         ref_web = st.text_area("웹사이트/기사", value=ans.get("ref_web", ""), placeholder="사이트명, 기사 제목, URL, 접속일자", label_visibility="collapsed")
 
-        if st.form_submit_button("활동지 최종 제출 및 저장"):
+        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {
                 "is_custom_act5": True, "info_course": info_course, "info_date": info_date, "info_school": info_school, "info_career": info_career,
@@ -312,7 +313,7 @@ def render_activity8_form(user_key):
         ])
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
         edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["항목"], key=f"df_{category}")
-        if st.form_submit_button("활동지 최종 제출 및 저장"):
+        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom_self_eval": True, "df1": edited_df.to_dict('records')}
             save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
@@ -342,7 +343,7 @@ def render_activity9_form(user_key):
         df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
         edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["시기", "중점 목표"], key="act9_df2")
 
-        if st.form_submit_button("활동지 최종 제출 및 저장"):
+        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
             save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
@@ -360,7 +361,7 @@ def render_submission_form(user_key, category, q_id, q_label):
         if ans.get("file_name"): st.info(f"📁 현재 등록된 파일: {ans.get('file_name')}")
         file_val = st.file_uploader("📂 첨부 파일 업로드 (새 파일을 올리면 기존 파일이 대체됩니다)")
         
-        if st.form_submit_button("제출 및 저장하기"):
+        if st.form_submit_button("제출 및 저장하기", type="primary"):
             if user_key not in data: data[user_key] = {}
             if category not in data[user_key]: data[user_key][category] = {}
             new_data = {"text": text_val, "link": link_val, "file_path": ans.get("file_path", ""), "file_name": ans.get("file_name", "")}
@@ -431,28 +432,28 @@ st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 # 💡 [CSS 전면 업데이트] 강력한 시인성 확보
 st.markdown("""
 <style>
-/* 1. 제출 버튼 (폼 안의 기본 submit 버튼) - 크고 진한 파란색 변경 요청 */
-button[kind="formSubmit"] {
-    background-color: #0056b3 !important;
+/* 1. 제출 버튼 (폼 안의 primary submit 버튼) - 진한 빨간색 및 크기 확대 */
+button[kind="primaryFormSubmit"] {
+    background-color: #FF4B4B !important;
     color: white !important;
-    font-size: 24px !important;
+    font-size: 22px !important;
     font-weight: 900 !important;
     padding: 15px !important;
     border-radius: 8px !important;
     border: none !important;
     min-height: 60px !important;
 }
-button[kind="formSubmit"] p {
-    font-size: 24px !important;
+button[kind="primaryFormSubmit"] p {
+    font-size: 22px !important;
     font-weight: 900 !important;
     color: white !important;
 }
 
-/* 2. 메인 화면으로 돌아가기 버튼 (하단 단일 배치, 진한 빨간색) */
+/* 2. 메인 화면으로 돌아가기 버튼 (하단 단일 배치, 진한 파란색) */
 div.element-container:has(.back-btn-wrapper) + div.element-container button {
-    background-color: #FF4B4B !important;
+    background-color: #0056b3 !important;
     color: white !important;
-    font-size: 24px !important;
+    font-size: 22px !important;
     font-weight: 900 !important;
     padding: 15px !important;
     border-radius: 8px !important;
@@ -460,7 +461,7 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button {
     min-height: 60px !important;
 }
 div.element-container:has(.back-btn-wrapper) + div.element-container button p {
-    font-size: 24px !important;
+    font-size: 22px !important;
     font-weight: 900 !important;
     color: white !important;
 }
@@ -502,7 +503,6 @@ st.sidebar.title("🔒 인증 센터")
 if st.session_state.logged_in:
     u_info = st.session_state.user_info
     
-    # 💡 [사이드바 상단 내 정보 콤팩트화]
     u_name = u_info['name']
     u_school = u_info.get('school', '소속없음')
     u_class = u_info.get('class_group', '')
@@ -570,9 +570,9 @@ else:
                     else: st.sidebar.error("❌ 가입하신 계정 유형(학생/교사)이 다릅니다.")
                 else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
-# 💡 [사이드바 푸터] 더욱 크고 진하게 개선 적용
+# 💡 [사이드바 푸터] 크기 살짝 축소하여 컴팩트하게 조정
 st.sidebar.markdown("---")
-st.sidebar.markdown("<div style='text-align: center; color: #222; font-size: 18px; font-weight: 900;'>🧑‍💻 만든 이: <br><span style='font-size: 24px; color: #000;'>G.E.M.S</span><br><span style='font-size: 16px;'>(울산교육청 진학지원단)</span></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='text-align: center; color: #222; font-size: 15px; font-weight: 900;'>🧑‍💻 만든 이:<br><span style='font-size: 20px; color: #000;'>G.E.M.S</span><br><span style='font-size: 13px;'>(울산교육청 진학지원단)</span></div>", unsafe_allow_html=True)
 
 # --- [5] 화면 분기 로직 ---
 if not st.session_state.logged_in:
@@ -604,9 +604,8 @@ else:
         else: st.warning("교사/관리자는 메인 화면의 '제출 모니터링 탭'을 이용해주세요.")
         
         st.markdown("<br><br>", unsafe_allow_html=True)
-        # 💡 [돌아가기 버튼 하단 단일 배치 및 빨간색 디자인을 위한 CSS 연동]
         st.markdown('<div class="back-btn-wrapper"></div>', unsafe_allow_html=True)
-        if st.button("⬅️ 메인 화면으로 돌아가기", use_container_width=True):
+        if st.button("⬅️ 메인 화면으로 돌아가기", key="btn_back_bottom", use_container_width=True):
             st.session_state.current_page = "main"; st.rerun()
 
     elif st.session_state.current_page == "main":
@@ -686,7 +685,7 @@ else:
                         mat_type = st.radio("자료 유형 선택", ["파일 업로드 (PPT, PDF 등)", "외부 링크 (Notion, Google Docs 등)"])
                         mat_link = st.text_input("외부 링크인 경우 URL을 입력하세요", placeholder="https://...")
                         mat_file = st.file_uploader("파일인 경우 이곳에 업로드하세요")
-                        if st.form_submit_button("자료 등록하여 공지사항에 올리기"):
+                        if st.form_submit_button("자료 등록하여 공지사항에 올리기", type="primary"):
                             if not mat_title: st.error("자료 제목을 입력해주세요.")
                             else:
                                 new_mat = {"id": f"mat_{datetime.datetime.now().strftime('%d%H%M%S')}", "title": mat_title}
@@ -865,7 +864,7 @@ else:
                                         if ans.get("link"): html_content += f"<b>[제출 링크]</b> <a href='{ans['link']}' target='_blank' class='link-text'>{ans['link']}</a><br><br>"
 
                             html_content += "</body></html>"
-                            st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')}의 포트폴리오 다운로드 (웹문서/PDF 변환용)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.html", mime="text/html")
+                            st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')}의 포트폴리오 다운로드 (웹문서/PDF 변환용)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.html", mime="text/html", type="primary")
                             
                             st.markdown("---")
                             st.markdown("#### 📍 [1] 활동지 작성 내역")
@@ -939,9 +938,12 @@ else:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {})
                                 u_info = all_users[s_uid]
                                 st.markdown(f"#### 👤 [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})")
-                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**"); st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
-                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**"); st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
-                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**"); st.info(ans.get("step3", "-")); st.markdown("---")
+                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**")
+                                st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
+                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**")
+                                st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
+                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**")
+                                st.info(ans.get("step3", "-")); st.markdown("---")
                                 
                                 csv_data.append([f"■ [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})", "", "", "", "", ""])
                                 csv_data.append(["[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기", "", "", "", "", ""])
@@ -957,7 +959,7 @@ else:
                                 csv_data.append(["==================================================", "", "", "", "", ""])
                                 csv_data.append(["", "", "", "", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv')
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[1]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1004,7 +1006,7 @@ else:
                                 csv_data.append(["==================================================", "", "", ""])
                                 csv_data.append(["", "", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv')
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view in [ACTIVITIES[2], ACTIVITIES[5], ACTIVITIES[6]]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1020,7 +1022,7 @@ else:
                                 for row in ans.get("df1", []): csv_data.append([row.get("구분", ""), row.get("피드백 내용 (구체적으로)", ""), row.get("보완 및 수정 계획", "")])
                                 csv_data.append(["", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv')
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[3]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1036,7 +1038,7 @@ else:
                                 for row in ans.get("df1", []): csv_data.append([row.get("사이트명", ""), row.get("제목", ""), row.get("내용", ""), row.get("선정이유", "")])
                                 csv_data.append(["", "", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv')
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[4]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1091,7 +1093,7 @@ else:
                                 csv_data.append(["==================================================", "", "", ""])
                                 csv_data.append(["", "", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv')
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[7]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1107,7 +1109,7 @@ else:
                                 for row in ans.get("df1", []): csv_data.append([row.get("항목", ""), row.get("내용", "")])
                                 csv_data.append(["", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv')
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[8]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1130,7 +1132,7 @@ else:
                                 for row in ans.get("df2", []): csv_data.append([row.get("시기", ""), row.get("중점 목표", ""), row.get("주요 활동 계획 (주제탐구, 독서, 실험 등)", "")])
                                 csv_data.append(["", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv')
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view in ACTIVITIES:
                             q_summary_data = []
