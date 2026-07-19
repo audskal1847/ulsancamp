@@ -117,20 +117,23 @@ def render_activity2_form(user_key):
         opts1_2 = ["수업이나 책을 보다가 생긴 의문을 파고들고 싶어서 (지적호기심)", "배운 원리를 실생활 문제(사회 문제) 해결에 직접 적용해 보고 싶어서 (문제해결)", "이전에 했던 탐구에서 남은 궁금증이나 한계를 더 발전시키고 싶어서 (연계 및 심화)"]
         step1_2 = st.radio("(2) 이 관심이 생긴 계기 (하나만 선택)", opts1_2, index=opts1_2.index(ans.get("step1_2", opts1_2[0])))
         st.markdown("**이전에 했던 탐구의 확장을 선택했다면 아래도 함께 채우세요.**")
+        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
         default_df1 = pd.DataFrame([{"구분": "이전에 했던 탐구 주제", "내용": ""}, {"구분": "그때 알아낸 것 (결론)", "내용": ""}, {"구분": "풀지 못했거나 아쉬웠던 점", "내용": ""}, {"구분": "이번에 발전시키고 싶은 방향", "내용": "(예: 대상 확대, 조건 변경, 다른 관점 적용, 해결책 제시 등)"}])
         df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
-        edited_df1 = st.data_editor(df1, hide_index=True, use_container_width=True, disabled=["구분"], key="act2_df1")
+        edited_df1 = st.data_editor(df1, hide_index=True, use_container_width=True, key="act2_df1")
         st.markdown("---")
         
         st.markdown("#### [2단계] 교과 개념에 닻 내리기: 내 관심사를 수업에서 배운 원리와 연결하기")
         st.markdown("<div style='background-color: #e8f4f8; padding: 10px; border-radius: 5px;'><i>좋은 탐구는 단순한 검색이 아니라 배운 개념 위에서 출발합니다. 과목 이름만 적지 말고, 배운 핵심 개념 하나를 구체적으로 적는 것이 중요합니다.</i></div>", unsafe_allow_html=True)
+        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
         default_df2 = pd.DataFrame([{"구분": "관련 교과목, 단원", "내용": "(예: 확률과 통계 - 통계적 추정)"}, {"구분": "수업에서 배운 핵심 개념", "내용": "(예: 표본 조사에서의 신뢰구간과 오차)"}, {"구분": "이 개념이 내 관심사와 연결되는 지점", "내용": ""}])
         df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
-        edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["구분"], key="act2_df2")
+        edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, key="act2_df2")
         step2_dir = st.text_input("**이 시점의 잠정적인 탐구 방향 (한 문장으로):**", value=ans.get("step2_dir", ""))
         st.markdown("---")
         
         st.markdown("#### [3단계] 주제 적절성 자가 진단: 주제가 고등학생 수준에 맞는지 점검")
+        st.caption("※ '판단(O/X)' 열에만 답변을 기입하세요.")
         default_df3 = pd.DataFrame([
             {"점검 항목": "1. 교과 개념 연계", "점검 질문": "교과서의 원리 없이 인터넷 검색만으로 알 수 있는 상식적인 내용인가?", "좋은 예": "(나쁜 예) 비타민을 많이 먹으면 좋은지 조사 → (좋은 예) 생명과학 I '방어 작용'을 바탕으로 면역 결핍과 자가면역이 일어나는 기작의 차이 비교", "판단 (O/X)": ""},
             {"점검 항목": "2. 시의성 (트렌드)", "점검 질문": "너무 유행을 타거나(정치적 이슈 등), 이미 결론이 난 철 지난 주제는 아닌가?", "좋은 예": "(나쁜 예) 특정 정치인을 화자로 시 쓰기 → (좋은 예) 현대 시 한 편을 문학 사조별 대표 시인의 화법으로 다시 쓰기...", "판단 (O/X)": ""},
@@ -138,7 +141,7 @@ def render_activity2_form(user_key):
             {"점검 항목": "4. 동기의 진정성", "점검 질문": "억지로 끼워 맞춘 것이 아니라 1단계의 계기에서 자연스럽게 이어지는가?", "좋은 예": "1단계에 적은 관심·계기와 흐름이 연결되는지 확인", "판단 (O/X)": ""}
         ])
         df3 = pd.DataFrame(ans.get("df3", default_df3.to_dict('records')))
-        edited_df3 = st.data_editor(df3, hide_index=True, use_container_width=True, disabled=["점검 항목", "점검 질문", "좋은 예"], key="act2_df3")
+        edited_df3 = st.data_editor(df3, hide_index=True, use_container_width=True, key="act2_df3")
         st.info("자가 진단 결과: 모든 항목이 O라면 다음 단계로 넘어가세요. 하나라도 X라면 주제를 수정해야 합니다.")
         st.markdown("---")
         
@@ -160,12 +163,13 @@ def render_activity2_form(user_key):
         st.markdown("---")
         
         st.markdown("#### [7단계] 나의 탐구 계획 완성하기")
+        st.caption("※ 첫 번째 열(항목)은 양식 제목이므로 수정하지 마세요.")
         default_df7 = pd.DataFrame([
             {"항목": "탐구 주제 (제목)", "내용": ""}, {"항목": "핵심 탐구 질문", "내용": ""}, {"항목": "연계 교과 개념", "내용": ""},
             {"항목": "탐구 전략", "내용": ""}, {"항목": "탐구 방법 (자료, 조사, 실험 등)", "내용": ""}, {"항목": "기대하는 결론, 알아낼 점", "내용": ""}
         ])
         df7 = pd.DataFrame(ans.get("df7", default_df7.to_dict('records')))
-        edited_df7 = st.data_editor(df7, hide_index=True, use_container_width=True, disabled=["항목"], key="act2_df7")
+        edited_df7 = st.data_editor(df7, hide_index=True, use_container_width=True, key="act2_df7")
         
         st.markdown("<br>**한 문장으로 요약한 나의 탐구**", unsafe_allow_html=True)
         col1, col2, col3, col4, col5, col6, col7 = st.columns([0.5, 2, 1.2, 2, 0.8, 2, 1.5])
@@ -192,9 +196,10 @@ def render_activity2_form(user_key):
 def render_feedback_form(user_key, category, rows):
     data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
     with st.form(key=f"form_{category}_{user_key}"):
+        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
         default_df = pd.DataFrame([{"구분": r, "피드백 내용 (구체적으로)": "", "보완 및 수정 계획": ""} for r in rows])
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
-        edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["구분"], key=f"df_{category}")
+        edited_df = st.data_editor(df, hide_index=True, use_container_width=True, key=f"df_{category}")
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom_feedback": True, "df1": edited_df.to_dict('records')}
@@ -246,9 +251,10 @@ def render_activity5_form(user_key):
         st.markdown("**3) 탐구 목적**")
         purpose = st.text_area("탐구 목적", value=ans.get("purpose", ""), placeholder="이 탐구로 최종적으로 무엇을 알아내거나 해결하려 하나요?", label_visibility="collapsed")
         st.markdown("**4) 이론적 배경**")
+        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
         default_bg_df = pd.DataFrame([{"구분": "핵심 용어의 뜻", "내용": "(활동지2의 2단계 교과 개념을 사전과 교과서 정의로 정리)"}, {"구분": "참고한 자료 요약", "내용": "(관련 책, 기사, 논문에서 알게 된 내용을 2~3줄로 정리)"}])
         bg_df = pd.DataFrame(ans.get("bg_df", default_bg_df.to_dict('records')))
-        edited_bg_df = st.data_editor(bg_df, hide_index=True, use_container_width=True, disabled=["구분"], key="act5_bg_df")
+        edited_bg_df = st.data_editor(bg_df, hide_index=True, use_container_width=True, key="act5_bg_df")
 
         st.markdown("---")
         st.markdown("#### 3. 탐구 설계 및 내용\n**가. 탐구 방법**")
@@ -298,13 +304,14 @@ def render_activity8_form(user_key):
     category = ACTIVITIES[7]
     data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
     with st.form(key=f"form_{category}_{user_key}"):
+        st.caption("※ 첫 번째 열(항목)은 양식 제목이므로 수정하지 마세요.")
         default_df = pd.DataFrame([
             {"항목": "1. 탐구 주제", "내용": ""}, {"항목": "2. [의문] 주제 선정 동기", "내용": ""},
             {"항목": "3. [문제해결] 과정 및 결과 요약", "내용": ""}, {"항목": "4. 활동에서 자신의 역할과 노력", "내용": ""},
             {"항목": "5. 배우고 느낀 점", "내용": ""}, {"항목": "6. 새롭게 알게 된 것", "내용": ""}, {"항목": "7. 후속 활동 계획", "내용": ""}
         ])
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
-        edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["항목"], key=f"df_{category}")
+        edited_df = st.data_editor(df, hide_index=True, use_container_width=True, key=f"df_{category}")
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom_self_eval": True, "df1": edited_df.to_dict('records')}
@@ -315,15 +322,17 @@ def render_activity9_form(user_key):
     data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
     with st.form(key=f"form_{category}_{user_key}"):
         st.markdown("#### 1. 꼬리에 꼬리를 무는 독서")
+        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
         default_df1 = pd.DataFrame([
             {"구분": "기초 도서\n(흥미/입문)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "이 책의 ____________ 부분을 읽고 ____________ 개념에 흥미를 가짐."},
             {"구분": "심화 도서\n(전공/이론)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "위 책에서 생긴 ____________ 에 대한 궁금증을 해결하기 위해 선정함."},
             {"구분": "확장 도서\n(융합/원서)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "관련 해외 원서나 논문을 읽고 ____________ 관점까지 확장함."}
         ])
         df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
-        edited_df1 = st.data_editor(df1, hide_index=True, use_container_width=True, disabled=["구분"], key="act9_df1")
+        edited_df1 = st.data_editor(df1, hide_index=True, use_container_width=True, key="act9_df1")
 
         st.markdown("#### 2. 나만의 3개년 실천 로드맵")
+        st.caption("※ 첫 번째와 두 번째 열은 양식 제목이므로 수정하지 마세요.")
         default_df2 = pd.DataFrame([
             {"시기": "1학년\n(겨울방학)", "중점 목표": "기초 역량\n& 진로 탐색", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "},
             {"시기": "2학년\n(1학기)", "중점 목표": "구체적 주제\n심화 탐구", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "},
@@ -331,7 +340,7 @@ def render_activity9_form(user_key):
             {"시기": "3학년\n(1학기)", "중점 목표": "완성\n& 면접 대비", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "}
         ])
         df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
-        edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["시기", "중점 목표"], key="act9_df2")
+        edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, key="act9_df2")
 
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
@@ -351,7 +360,7 @@ def render_submission_form(user_key, category, q_id, q_label):
         if ans.get("file_name"): st.info(f"📁 현재 등록된 파일: {ans.get('file_name')}")
         file_val = st.file_uploader("📂 첨부 파일 업로드 (새 파일을 올리면 기존 파일이 대체됩니다)")
         
-        if st.form_submit_button("제출 및 저장하기"):
+        if st.form_submit_button("제출 및 저장하기", type="primary"):
             if user_key not in data: data[user_key] = {}
             if category not in data[user_key]: data[user_key][category] = {}
             new_data = {"text": text_val, "link": link_val, "file_path": ans.get("file_path", ""), "file_name": ans.get("file_name", "")}
@@ -419,23 +428,49 @@ def render_camp_overview(current_role):
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
-# 💡 [핵심 CSS 주입] 표 제목 및 전체 디자인 시인성 대폭 강화
+# 💡 [CSS 업데이트] 1. 버튼 강조, 2. 표 글씨 강조 및 검은색 처리
 st.markdown("""
 <style>
-/* 표 렌더링 시 제목 폰트 크기 및 색상 강조 */
-div[data-testid="stDataFrame"] {
+/* 1. 제출 및 메인화면 이동 버튼 디자인 (크고 굵은 파란색) */
+button[kind="primary"] {
+    background-color: #0056b3 !important;
+    color: white !important;
+    font-size: 20px !important;
+    font-weight: 900 !important;
+    padding: 15px !important;
+    border-radius: 8px !important;
+    border: none !important;
+    height: auto !important;
+    min-height: 60px !important;
+}
+button[kind="primary"] p {
+    font-size: 20px !important;
+    font-weight: 900 !important;
+    margin: 0 !important;
+}
+
+/* 2. 표(Data Editor) 디자인 시인성 대폭 강화 */
+/* 표 테두리와 전반적인 폰트 크기/색상 조정 */
+[data-testid="stDataFrame"] {
     border: 2px solid #1E3A8A !important;
     border-radius: 5px;
+    color: #000000 !important;
 }
-[data-testid="stDataFrame"] th, table th {
-    color: #003366 !important;
+[data-testid="stDataFrame"] [data-testid="stDataFrameResizable"] {
     font-size: 16px !important;
-    font-weight: 900 !important;
-    background-color: #E0F2FE !important;
+    font-weight: bold !important;
 }
-/* 캔버스용 텍스트 컬러 변수 재정의 */
-:root {
-    --text-color: #002244;
+/* 정적 테이블(HTML 출력시) 헤더 및 셀 제어 */
+th {
+    color: #000000 !important;
+    font-size: 18px !important;
+    font-weight: 900 !important;
+    background-color: #f0f2f6 !important;
+}
+td {
+    font-size: 16px !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -472,7 +507,7 @@ else:
         reg_name = st.sidebar.text_input("이름 입력")
         reg_pw = st.sidebar.text_input("비밀번호", type="password")
         
-        if st.sidebar.button("가입 신청", use_container_width=True):
+        if st.sidebar.button("가입 신청", type="primary", use_container_width=True):
             if reg_role and reg_id and reg_pw and reg_name:
                 user_key = f"{reg_school}_{reg_id}" if reg_role == "학생" else f"teacher_{reg_id}"
                 if user_key in users: st.sidebar.error("❌ 해당 학번/ID가 이미 존재합니다.")
@@ -489,7 +524,7 @@ else:
         input_id = st.sidebar.text_input("학번/ID")
         input_pw = st.sidebar.text_input("비밀번호", type="password")
         
-        if st.sidebar.button("로그인", use_container_width=True):
+        if st.sidebar.button("로그인", type="primary", use_container_width=True):
             if input_id in ADMIN_ACCOUNTS and input_pw == ADMIN_ACCOUNTS[input_id]:
                 st.session_state.logged_in = True
                 st.session_state.user_info = {"user_key": input_id, "username": input_id, "name": f"총괄운영자({input_id})", "role": "관리자", "school": "운영본부", "class_group": "관리자"}
@@ -504,7 +539,7 @@ else:
                     else: st.sidebar.error("❌ 가입하신 계정 유형(학생/교사)이 다릅니다.")
                 else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
-# 💡 [사이드바 푸터] 디자인 및 위치 개선
+# 💡 [사이드바 푸터] 디자인 및 위치 개선 적용
 st.sidebar.markdown("---")
 st.sidebar.markdown("<div style='text-align: center; color: #666; font-size: 14px;'>🧑‍💻 만든 이: <b>G.E.M.S</b><br>(울산교육청 진학지원단)</div>", unsafe_allow_html=True)
 
@@ -522,10 +557,6 @@ else:
     if st.session_state.current_page in ACTIVITIES:
         act_name = st.session_state.current_page
         st.title(f"📄 {act_name}")
-        
-        # 💡 [핵심 추가 1] 화면 상단 "메인 화면으로 돌아가기" 버튼 강조
-        if st.button("⬅️ 메인 화면으로 돌아가기", key="btn_back_top", type="primary", use_container_width=True):
-            st.session_state.current_page = "main"; st.rerun()
         st.markdown("---")
         
         if current_role == "학생":
@@ -541,8 +572,8 @@ else:
             else: render_submission_form(current_user_key, act_name, "content", f"{act_name} 제출란")
         else: st.warning("교사/관리자는 메인 화면의 '제출 모니터링 탭'을 이용해주세요.")
         
-        st.markdown("---")
-        # 💡 [핵심 추가 2] 화면 하단 "메인 화면으로 돌아가기" 버튼 강조
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        # 💡 [화면 하단] 메인화면으로 돌아가기 단일 버튼 강조 배치
         if st.button("⬅️ 메인 화면으로 돌아가기", key="btn_back_bottom", type="primary", use_container_width=True):
             st.session_state.current_page = "main"; st.rerun()
 
@@ -585,7 +616,7 @@ else:
                         st.write("❌ **회원 강제 탈퇴(삭제)**")
                         delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if delete_target != "선택":
-                            if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제", type="primary"):
+                            if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제"):
                                 del all_users[delete_target]; save_json(USERS_FILE, all_users); st.success("삭제 완료"); st.rerun()
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
@@ -603,7 +634,7 @@ else:
                         mat_type = st.radio("자료 유형 선택", ["파일 업로드 (PPT, PDF 등)", "외부 링크 (Notion, Google Docs 등)"])
                         mat_link = st.text_input("외부 링크인 경우 URL을 입력하세요", placeholder="https://...")
                         mat_file = st.file_uploader("파일인 경우 이곳에 업로드하세요")
-                        if st.form_submit_button("자료 등록하여 공지사항에 올리기"):
+                        if st.form_submit_button("자료 등록하여 공지사항에 올리기", type="primary"):
                             if not mat_title: st.error("자료 제목을 입력해주세요.")
                             else:
                                 new_mat = {"id": f"mat_{datetime.datetime.now().strftime('%d%H%M%S')}", "title": mat_title}
@@ -638,7 +669,7 @@ else:
                         st.write("❌ **기존 학습 차시 폐쇄**")
                         del_tab_target = st.selectbox("삭제할 차시를 지정하세요", ["선택"] + app_config["tabs"])
                         if del_tab_target != "선택":
-                            if st.button(f"🔥 {del_tab_target} 세션 및 질문 전체 삭제", type="primary"):
+                            if st.button(f"🔥 {del_tab_target} 세션 및 질문 전체 삭제"):
                                 app_config["tabs"].remove(del_tab_target); app_config["pdfs"].pop(del_tab_target, None); app_config["questions"].pop(del_tab_target, None)
                                 save_json(CONFIG_FILE, app_config); st.success(f"삭제 완료."); st.rerun()
                                 
@@ -658,7 +689,7 @@ else:
                         with q_col2:
                             if current_qs:
                                 del_q_target = st.selectbox("삭제할 문항을 고르세요", options=current_qs, format_func=lambda x: x.get("label", ""))
-                                if st.button("선택한 문항 삭제", type="primary"):
+                                if st.button("선택한 문항 삭제"):
                                     current_qs.remove(del_q_target); app_config["questions"][target_q_tab] = current_qs; save_json(CONFIG_FILE, app_config); st.success("삭제 완료."); st.rerun()
 
             with menu_tabs[-1]:
@@ -856,9 +887,12 @@ else:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {})
                                 u_info = all_users[s_uid]
                                 st.markdown(f"#### 👤 [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})")
-                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**"); st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
-                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**"); st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
-                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**"); st.info(ans.get("step3", "-")); st.markdown("---")
+                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**")
+                                st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
+                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**")
+                                st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
+                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**")
+                                st.info(ans.get("step3", "-")); st.markdown("---")
                                 
                                 csv_data.append([f"■ [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})", "", "", "", "", ""])
                                 csv_data.append(["[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기", "", "", "", "", ""])
