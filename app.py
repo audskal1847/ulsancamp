@@ -431,9 +431,9 @@ st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 # 💡 [CSS 전면 업데이트] 강력한 시인성 확보
 st.markdown("""
 <style>
-/* 1. 제출 버튼 (폼 안의 기본 submit 버튼) - 크고 진한 빨간색 유지 및 강조 */
+/* 1. 제출 버튼 (폼 안의 기본 submit 버튼) - 크고 진한 파란색 변경 요청 */
 button[kind="formSubmit"] {
-    background-color: #FF4B4B !important;
+    background-color: #0056b3 !important;
     color: white !important;
     font-size: 24px !important;
     font-weight: 900 !important;
@@ -445,11 +445,12 @@ button[kind="formSubmit"] {
 button[kind="formSubmit"] p {
     font-size: 24px !important;
     font-weight: 900 !important;
+    color: white !important;
 }
 
-/* 2. 메인 화면으로 돌아가기 버튼 (특별 파란색 버튼) */
-div:has(.blue-btn) button {
-    background-color: #0056b3 !important;
+/* 2. 메인 화면으로 돌아가기 버튼 (하단 단일 배치, 진한 빨간색) */
+div.element-container:has(.back-btn-wrapper) + div.element-container button {
+    background-color: #FF4B4B !important;
     color: white !important;
     font-size: 24px !important;
     font-weight: 900 !important;
@@ -458,10 +459,12 @@ div:has(.blue-btn) button {
     border: none !important;
     min-height: 60px !important;
 }
-div:has(.blue-btn) p {
+div.element-container:has(.back-btn-wrapper) + div.element-container button p {
     font-size: 24px !important;
     font-weight: 900 !important;
+    color: white !important;
 }
+.back-btn-wrapper { display: none; }
 
 /* 3. 표(Data Editor) 디자인 시인성 대폭 강화 (강제 검은색/굵게) */
 [data-testid="stDataFrame"] {
@@ -498,11 +501,22 @@ if "current_page" not in st.session_state: st.session_state.current_page = "main
 st.sidebar.title("🔒 인증 센터")
 if st.session_state.logged_in:
     u_info = st.session_state.user_info
-    st.sidebar.success(f"🟢 {u_info['name']} 님 로그인 중")
-    display_class = u_info.get('class_group', '')
-    if display_class and display_class != "관리자": st.sidebar.write(f"🏫 소속: {u_info.get('school', '소속없음')} ({display_class})")
-    else: st.sidebar.write(f"🏫 소속: {u_info.get('school', '소속없음')}")
-    st.sidebar.write(f"🛡️ 권한: {u_info['role']}")
+    
+    # 💡 [사이드바 상단 내 정보 콤팩트화]
+    u_name = u_info['name']
+    u_school = u_info.get('school', '소속없음')
+    u_class = u_info.get('class_group', '')
+    u_role = u_info['role']
+    school_text = f"{u_school} ({u_class})" if u_class and u_class != "관리자" else u_school
+    
+    st.sidebar.markdown(f"""
+    <div style='background-color: #e8f4f8; padding: 10px; border-radius: 5px; margin-bottom: 15px; line-height: 1.4;'>
+        <div style='font-size: 15px; font-weight: bold; color: #0056b3; margin-bottom: 3px;'>🟢 {u_name} 님 로그인 중</div>
+        <div style='font-size: 14px; color: #333; margin-bottom: 2px;'>🏫 {school_text}</div>
+        <div style='font-size: 14px; color: #333;'>🛡️ 권한: {u_role}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     if st.sidebar.button("로그아웃", use_container_width=True):
         st.session_state.logged_in = False; st.session_state.user_info = None; st.session_state.current_page = "main"; st.rerun()
 else:
@@ -527,12 +541,7 @@ else:
                 user_key = f"{reg_school}_{reg_id}" if reg_role == "학생" else f"teacher_{reg_id}"
                 if user_key in users: st.sidebar.error("❌ 해당 학번/ID가 이미 존재합니다.")
                 else:
-                    # 💡 [신규 가입자 승인 대기 설정]
-                    users[user_key] = {
-                        "id": reg_id, "password": reg_pw, "name": reg_name, 
-                        "role": reg_role, "school": reg_school if reg_role == "학생" else "소속없음", 
-                        "class_group": reg_class, "approved": False
-                    }
+                    users[user_key] = {"id": reg_id, "password": reg_pw, "name": reg_name, "role": reg_role, "school": reg_school if reg_role == "학생" else "소속없음", "class_group": reg_class, "approved": False}
                     save_json(USERS_FILE, users); st.sidebar.success("🎉 가입 완료! 관리자의 승인을 기다려주세요.")
             else: st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
@@ -553,16 +562,15 @@ else:
                 user_key = f"{login_school}_{input_id}" if login_type == "학생" else f"teacher_{input_id}"
                 if user_key in users and users[user_key].get("password") == input_pw:
                     if users[user_key].get("role") == login_type:
-                        # 💡 [승인 여부 확인]
                         if users[user_key].get("approved", True):
                             st.session_state.logged_in = True
                             st.session_state.user_info = {"user_key": user_key, "username": users[user_key].get("id", input_id), "name": users[user_key].get("name", "이름없음"), "role": users[user_key].get("role", login_type), "school": users[user_key].get("school", "소속없음"), "class_group": users[user_key].get("class_group", "미배정")}
                             st.rerun()
-                        else: st.sidebar.warning("⏳ 관리자(교사)의 가입 승인을 대기 중입니다. 승인 후 로그인할 수 있습니다.")
+                        else: st.sidebar.warning("⏳ 관리자(교사)의 가입 승인을 대기 중입니다.")
                     else: st.sidebar.error("❌ 가입하신 계정 유형(학생/교사)이 다릅니다.")
                 else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
-# 💡 [사이드바 푸터] 더욱 크고 진하게 개선
+# 💡 [사이드바 푸터] 더욱 크고 진하게 개선 적용
 st.sidebar.markdown("---")
 st.sidebar.markdown("<div style='text-align: center; color: #222; font-size: 18px; font-weight: 900;'>🧑‍💻 만든 이: <br><span style='font-size: 24px; color: #000;'>G.E.M.S</span><br><span style='font-size: 16px;'>(울산교육청 진학지원단)</span></div>", unsafe_allow_html=True)
 
@@ -596,9 +604,9 @@ else:
         else: st.warning("교사/관리자는 메인 화면의 '제출 모니터링 탭'을 이용해주세요.")
         
         st.markdown("<br><br>", unsafe_allow_html=True)
-        # 💡 [돌아가기 버튼 하단 단일 배치 및 파란색 디자인 적용]
-        st.markdown('<div class="blue-btn"></div>', unsafe_allow_html=True)
-        if st.button("⬅️ 메인 화면으로 돌아가기", key="btn_back_bottom", use_container_width=True):
+        # 💡 [돌아가기 버튼 하단 단일 배치 및 빨간색 디자인을 위한 CSS 연동]
+        st.markdown('<div class="back-btn-wrapper"></div>', unsafe_allow_html=True)
+        if st.button("⬅️ 메인 화면으로 돌아가기", use_container_width=True):
             st.session_state.current_page = "main"; st.rerun()
 
     elif st.session_state.current_page == "main":
@@ -626,7 +634,6 @@ else:
                 pending_users = {k: v for k, v in all_users.items() if not v.get("approved", True)}
                 approved_users = {k: v for k, v in all_users.items() if v.get("approved", True)}
 
-                # 💡 [가입 승인 대기 목록 UI 추가]
                 st.subheader("⏳ 가입 승인 대기 목록")
                 if pending_users:
                     df_pending = pd.DataFrame([{"학교": info.get("school", "-"), "학번/ID": info.get("id", k.split('_')[-1]), "이름": info.get("name", "이름없음"), "권한": info.get("role", "-"), "반": info.get("class_group", "-")} for k, info in pending_users.items()])
@@ -635,10 +642,10 @@ else:
                     with col_app1:
                         approve_target = st.selectbox("승인할 회원을 선택하세요", ["선택"] + list(pending_users.keys()), format_func=lambda x: x if x == "선택" else f"[{pending_users[x].get('school', '소속없음')}] {pending_users[x].get('name', '이름없음')} ({pending_users[x].get('id', x.split('_')[-1])})")
                         if approve_target != "선택":
-                            if st.button("✅ 선택한 회원 가입 승인", type="primary"):
+                            if st.button("✅ 선택한 회원 가입 승인"):
                                 all_users[approve_target]["approved"] = True; save_json(USERS_FILE, all_users); st.success("승인 완료!"); st.rerun()
                     with col_app2:
-                        if st.button("✅ 대기 중인 모든 회원 일괄 승인", type="primary"):
+                        if st.button("✅ 대기 중인 모든 회원 일괄 승인"):
                             for uid in pending_users.keys(): all_users[uid]["approved"] = True
                             save_json(USERS_FILE, all_users); st.success("일괄 승인 완료!"); st.rerun()
                 else: st.info("가입 승인을 대기 중인 회원이 없습니다.")
@@ -932,12 +939,9 @@ else:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {})
                                 u_info = all_users[s_uid]
                                 st.markdown(f"#### 👤 [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})")
-                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**")
-                                st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
-                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**")
-                                st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
-                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**")
-                                st.info(ans.get("step3", "-")); st.markdown("---")
+                                st.markdown("**[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기**"); st.dataframe(pd.DataFrame(ans.get("df1", [])), use_container_width=True)
+                                st.markdown("**[2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기**"); st.dataframe(pd.DataFrame(ans.get("df2", [])), use_container_width=True)
+                                st.markdown("**[3단계] 탐구 주제 및 문제 인식**"); st.info(ans.get("step3", "-")); st.markdown("---")
                                 
                                 csv_data.append([f"■ [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})", "", "", "", "", ""])
                                 csv_data.append(["[1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기", "", "", "", "", ""])
