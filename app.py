@@ -71,7 +71,7 @@ def init_system():
     
     current_config = load_json(CONFIG_FILE, default_config)
     
-    # 💡 [강제 덮어쓰기 로직] 기존 config.json이 5차시로 꼬여있어도 코드가 알아서 8차시로 복구합니다.
+    # 기존 config.json이 5차시 등으로 꼬여있으면 8차시 폼으로 덮어씌웁니다.
     needs_update = False
     if current_config.get("tabs") != default_tabs:
         current_config["tabs"] = default_tabs
@@ -373,6 +373,32 @@ def render_activity9_form(user_key):
             data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
             save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
 
+def render_submission_form(user_key, category, q_id, q_label):
+    data = load_json(DATA_FILE, {})
+    ans = data.get(user_key, {}).get(category, {}).get(q_id, {})
+    if isinstance(ans, str): ans = {"text": ans, "link": "", "file_name": "", "file_path": ""}
+        
+    with st.form(key=f"form_{user_key}_{category}_{q_id}"):
+        st.markdown(f"**{q_label}**")
+        st.caption("텍스트 입력, 외부 링크 주소, 파일 첨부 중 원하는 방식을 하나 이상 선택하여 제출하세요.")
+        text_val = st.text_area("📝 텍스트 내용 작성", value=ans.get("text", ""), height=150)
+        link_val = st.text_input("🔗 관련 링크(URL) 제출", value=ans.get("link", ""), placeholder="https://...")
+        if ans.get("file_name"): st.info(f"📁 현재 등록된 파일: {ans.get('file_name')}")
+        file_val = st.file_uploader("📂 첨부 파일 업로드 (새 파일을 올리면 기존 파일이 대체됩니다)")
+        
+        if st.form_submit_button("제출 및 저장하기", type="primary"):
+            if user_key not in data: data[user_key] = {}
+            if category not in data[user_key]: data[user_key][category] = {}
+            new_data = {"text": text_val, "link": link_val, "file_path": ans.get("file_path", ""), "file_name": ans.get("file_name", "")}
+            if file_val is not None:
+                safe_filename = f"{user_key}_{category}_{q_id}_{file_val.name}".replace("/", "_").replace("\\", "_")
+                file_path = os.path.join(UPLOAD_DIR, safe_filename)
+                with open(file_path, "wb") as f: f.write(file_val.getvalue())
+                new_data["file_path"] = file_path; new_data["file_name"] = file_val.name
+            data[user_key][category][q_id] = new_data
+            save_json(DATA_FILE, data)
+            st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
+
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role):
     st.header("🎯 [학생-호계고-거점학교] 주제 탐구 캠프 (26-하계방학)")
@@ -430,8 +456,8 @@ st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
 st.markdown("""
 <style>
-/* 1. 제출 버튼 (폼 안의 primary submit 버튼) - 진한 빨간색 및 크기 확대 */
-button[kind="primaryFormSubmit"] {
+/* 1. 제출 버튼 (폼 안의 제출 버튼) - 진한 빨간색 및 크기 확대 */
+[data-testid="stFormSubmitButton"] button {
     background-color: #FF4B4B !important;
     color: white !important;
     font-size: 22px !important;
@@ -440,8 +466,9 @@ button[kind="primaryFormSubmit"] {
     border-radius: 8px !important;
     border: none !important;
     min-height: 60px !important;
+    width: 100% !important;
 }
-button[kind="primaryFormSubmit"] p {
+[data-testid="stFormSubmitButton"] button p {
     font-size: 22px !important;
     font-weight: 900 !important;
     color: white !important;
@@ -597,6 +624,7 @@ else:
             elif act_name == ACTIVITIES[6]: render_activity7_form(current_user_key)
             elif act_name == ACTIVITIES[7]: render_activity8_form(current_user_key)
             elif act_name == ACTIVITIES[8]: render_activity9_form(current_user_key)
+            else: render_submission_form(current_user_key, act_name, "content", f"{act_name} 제출란")
         else: st.warning("교사/관리자는 메인 화면의 '제출 모니터링 탭'을 이용해주세요.")
         
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -616,7 +644,7 @@ else:
                     st.markdown("---")
                     questions = app_config["questions"].get(tab_name, [])
                     
-                    # 💡 [핵심 변경] 차시별 제출 폼: 오직 텍스트 입력만 가능, 제출 버튼은 맨 아래 1개로 통합
+                    # 💡 [핵심 변경] 차시별 제출 폼을 텍스트 전용으로 바꾸고 하나로 통합 (제출버튼 1개)
                     with st.form(key=f"form_{current_user_key}_{tab_name}"):
                         st.caption("아래 질문들에 대한 답변을 텍스트로 작성한 후, 맨 아래의 [제출 및 저장하기] 버튼을 눌러주세요.")
                         ans_dict = {}
@@ -630,7 +658,7 @@ else:
                             ans_dict[q_id] = st.text_area("내용 작성", value=existing_text, height=150, key=f"text_{current_user_key}_{tab_name}_{q_id}", label_visibility="collapsed")
                             st.markdown("<br>", unsafe_allow_html=True)
                         
-                        if st.form_submit_button("제출 및 저장하기", type="primaryFormSubmit"):
+                        if st.form_submit_button("제출 및 저장하기", type="primary"):
                             if current_user_key not in learning_data: learning_data[current_user_key] = {}
                             if tab_name not in learning_data[current_user_key]: learning_data[current_user_key][tab_name] = {}
                             for q_id, text_val in ans_dict.items():
@@ -658,10 +686,10 @@ else:
                     with col_app1:
                         approve_target = st.selectbox("승인할 회원을 선택하세요", ["선택"] + list(pending_users.keys()), format_func=lambda x: x if x == "선택" else f"[{pending_users[x].get('school', '소속없음')}] {pending_users[x].get('name', '이름없음')} ({pending_users[x].get('id', x.split('_')[-1])})")
                         if approve_target != "선택":
-                            if st.button("✅ 선택한 회원 가입 승인"):
+                            if st.button("✅ 선택한 회원 가입 승인", type="primary"):
                                 all_users[approve_target]["approved"] = True; save_json(USERS_FILE, all_users); st.success("승인 완료!"); st.rerun()
                     with col_app2:
-                        if st.button("✅ 대기 중인 모든 회원 일괄 승인"):
+                        if st.button("✅ 대기 중인 모든 회원 일괄 승인", type="primary"):
                             for uid in pending_users.keys(): all_users[uid]["approved"] = True
                             save_json(USERS_FILE, all_users); st.success("일괄 승인 완료!"); st.rerun()
                 else: st.info("가입 승인을 대기 중인 회원이 없습니다.")
@@ -684,14 +712,14 @@ else:
                         st.write("❌ **회원 강제 탈퇴(삭제)**")
                         delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if delete_target != "선택":
-                            if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제"):
+                            if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제", type="primary"):
                                 del all_users[delete_target]; save_json(USERS_FILE, all_users); st.success("삭제 완료"); st.rerun()
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
                         pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         new_pw = st.text_input("새로운 비밀번호 입력", type="password")
                         if pw_target != "선택":
-                            if st.button("비밀번호 변경 적용") and new_pw:
+                            if st.button("비밀번호 변경 적용", type="primary") and new_pw:
                                 all_users[pw_target]["password"] = new_pw; save_json(USERS_FILE, all_users); st.success("비밀번호 성공적으로 변경"); st.rerun()
 
             if current_role == "관리자":
@@ -702,7 +730,7 @@ else:
                         mat_type = st.radio("자료 유형 선택", ["파일 업로드 (PPT, PDF 등)", "외부 링크 (Notion, Google Docs 등)"])
                         mat_link = st.text_input("외부 링크인 경우 URL을 입력하세요", placeholder="https://...")
                         mat_file = st.file_uploader("파일인 경우 이곳에 업로드하세요")
-                        if st.form_submit_button("자료 등록하여 공지사항에 올리기", type="primaryFormSubmit"):
+                        if st.form_submit_button("자료 등록하여 공지사항에 올리기", type="primary"):
                             if not mat_title: st.error("자료 제목을 입력해주세요.")
                             else:
                                 new_mat = {"id": f"mat_{datetime.datetime.now().strftime('%d%H%M%S')}", "title": mat_title}
@@ -719,7 +747,7 @@ else:
                     if current_materials:
                         st.write("🗑️ **등록된 강의 자료 삭제**")
                         del_mat_target = st.selectbox("삭제할 자료를 선택하세요", options=current_materials, format_func=lambda x: x.get("title", "제목없음"))
-                        if st.button("선택한 자료 삭제하기"):
+                        if st.button("선택한 자료 삭제하기", type="primary"):
                             app_config["materials"].remove(del_mat_target); save_json(CONFIG_FILE, app_config); st.success("삭제 완료!"); st.rerun()
                     
                     st.markdown("---")
@@ -729,7 +757,7 @@ else:
                         st.write("➕ **새로운 학습 차시 추가**")
                         new_tab_name = st.text_input("추가할 차시 이름 입력")
                         new_pdf_name = st.text_input("연결할 PDF 파일명", value="session_new.pdf")
-                        if st.button("차시 개설하기"):
+                        if st.button("차시 개설하기", type="primary"):
                             if new_tab_name and new_tab_name not in app_config["tabs"]:
                                 app_config["tabs"].append(new_tab_name); app_config["pdfs"][new_tab_name] = new_pdf_name; app_config["questions"][new_tab_name] = []
                                 save_json(CONFIG_FILE, app_config); st.success(f"🎉 {new_tab_name} 개설 완료."); st.rerun()
@@ -737,7 +765,7 @@ else:
                         st.write("❌ **기존 학습 차시 폐쇄**")
                         del_tab_target = st.selectbox("삭제할 차시를 지정하세요", ["선택"] + app_config["tabs"])
                         if del_tab_target != "선택":
-                            if st.button(f"🔥 {del_tab_target} 세션 및 질문 전체 삭제"):
+                            if st.button(f"🔥 {del_tab_target} 세션 및 질문 전체 삭제", type="primary"):
                                 app_config["tabs"].remove(del_tab_target); app_config["pdfs"].pop(del_tab_target, None); app_config["questions"].pop(del_tab_target, None)
                                 save_json(CONFIG_FILE, app_config); st.success(f"삭제 완료."); st.rerun()
                                 
@@ -750,14 +778,14 @@ else:
                         q_col1, q_col2 = st.columns(2)
                         with q_col1:
                             add_q_label = st.text_input("질문 설명(라벨) 문구 입력")
-                            if st.button("질문 추가") and add_q_label:
+                            if st.button("질문 추가", type="primary") and add_q_label:
                                 new_id = f"q_{datetime.datetime.now().strftime('%d%H%M%S')}"
                                 current_qs.append({"id": new_id, "label": add_q_label})
                                 app_config["questions"][target_q_tab] = current_qs; save_json(CONFIG_FILE, app_config); st.success("문항 추가 완료."); st.rerun()
                         with q_col2:
                             if current_qs:
                                 del_q_target = st.selectbox("삭제할 문항을 고르세요", options=current_qs, format_func=lambda x: x.get("label", ""))
-                                if st.button("선택한 문항 삭제"):
+                                if st.button("선택한 문항 삭제", type="primary"):
                                     current_qs.remove(del_q_target); app_config["questions"][target_q_tab] = current_qs; save_json(CONFIG_FILE, app_config); st.success("삭제 완료."); st.rerun()
 
             with menu_tabs[-1]:
@@ -880,7 +908,7 @@ else:
                                         html_content += f"<div class='content-box'>{ans['text']}</div>"
 
                             html_content += "</body></html>"
-                            st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')}의 포트폴리오 다운로드 (웹문서/PDF 변환용)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.html", mime="text/html", type="primaryFormSubmit")
+                            st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')}의 포트폴리오 다운로드 (웹문서/PDF 변환용)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.html", mime="text/html", type="primary")
                             
                             st.markdown("---")
                             st.markdown("#### 📍 [1] 활동지 작성 내역")
@@ -973,7 +1001,7 @@ else:
                                 csv_data.append(["==================================================", "", "", "", "", ""])
                                 csv_data.append(["", "", "", "", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primaryFormSubmit")
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[1]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1020,7 +1048,7 @@ else:
                                 csv_data.append(["==================================================", "", "", ""])
                                 csv_data.append(["", "", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primaryFormSubmit")
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view in [ACTIVITIES[2], ACTIVITIES[5], ACTIVITIES[6]]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1036,7 +1064,7 @@ else:
                                 for row in ans.get("df1", []): csv_data.append([row.get("구분", ""), row.get("피드백 내용 (구체적으로)", ""), row.get("보완 및 수정 계획", "")])
                                 csv_data.append(["", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primaryFormSubmit")
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[3]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1052,7 +1080,7 @@ else:
                                 for row in ans.get("df1", []): csv_data.append([row.get("사이트명", ""), row.get("제목", ""), row.get("내용", ""), row.get("선정이유", "")])
                                 csv_data.append(["", "", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primaryFormSubmit")
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[4]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1107,7 +1135,7 @@ else:
                                 csv_data.append(["==================================================", "", "", ""])
                                 csv_data.append(["", "", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primaryFormSubmit")
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[7]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1123,7 +1151,7 @@ else:
                                 for row in ans.get("df1", []): csv_data.append([row.get("항목", ""), row.get("내용", "")])
                                 csv_data.append(["", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primaryFormSubmit")
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view == ACTIVITIES[8]:
                             st.info("💡 아래 화면은 렌더링된 모습이며, 하단의 버튼을 누르면 세로 형식으로 정리된 엑셀(CSV) 파일을 받을 수 있습니다.")
@@ -1146,7 +1174,7 @@ else:
                                 for row in ans.get("df2", []): csv_data.append([row.get("시기", ""), row.get("중점 목표", ""), row.get("주요 활동 계획 (주제탐구, 독서, 실험 등)", "")])
                                 csv_data.append(["", "", ""])
                             df_csv = pd.DataFrame(csv_data)
-                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primaryFormSubmit")
+                            st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
                         elif selected_view in app_config["tabs"]:
                             for q in app_config["questions"].get(selected_view, []):
