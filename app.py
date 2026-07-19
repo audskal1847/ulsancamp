@@ -401,7 +401,7 @@ def render_submission_form(user_key, category, q_id, q_label):
 
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role):
-    st.header("🎯 [학생-호계고-거점학교] 주제 탐구 캠프 (26-하계방학)")
+    st.header("🎯 [학생-거점학교] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
     st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
     schedule_data = [
@@ -550,15 +550,15 @@ else:
     
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
-        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
+        reg_role = st.sidebar.selectbox("유형", ["학생", "교사"])
         if reg_role == "학생": 
-            reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
+            reg_school = st.sidebar.text_input("소속 학교")
             reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
         else: 
             reg_school = "교사소속"; reg_class = "교사"
             
-        reg_id = st.sidebar.text_input("학번/ID 입력")
-        reg_name = st.sidebar.text_input("이름 입력")
+        reg_id = st.sidebar.text_input("학번")
+        reg_name = st.sidebar.text_input("이름")
         reg_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("가입 신청", type="primary", use_container_width=True):
@@ -572,7 +572,7 @@ else:
                 
     elif auth_choice == "로그인":
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사"])
-        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
+        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교")
         else: login_school = ""
             
         input_id = st.sidebar.text_input("학번/ID")
