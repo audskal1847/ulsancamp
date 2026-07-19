@@ -408,8 +408,7 @@ def render_camp_overview(current_role):
 
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
-            st.markdown("- [🔗 모둠 구성 확인하기 (구글 문서)](#)")
+        with st.expander("👥 캠프 운영 관련 안내", expanded=True):
             st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
             st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
             st.markdown("- [🔗 신정고 캠프 학생 결과물 모음](https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client)")
