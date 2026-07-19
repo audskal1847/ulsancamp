@@ -373,35 +373,9 @@ def render_activity9_form(user_key):
             data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
             save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
 
-def render_submission_form(user_key, category, q_id, q_label):
-    data = load_json(DATA_FILE, {})
-    ans = data.get(user_key, {}).get(category, {}).get(q_id, {})
-    if isinstance(ans, str): ans = {"text": ans, "link": "", "file_name": "", "file_path": ""}
-        
-    with st.form(key=f"form_{user_key}_{category}_{q_id}"):
-        st.markdown(f"**{q_label}**")
-        st.caption("텍스트 입력, 외부 링크 주소, 파일 첨부 중 원하는 방식을 하나 이상 선택하여 제출하세요.")
-        text_val = st.text_area("📝 텍스트 내용 작성", value=ans.get("text", ""), height=150)
-        link_val = st.text_input("🔗 관련 링크(URL) 제출", value=ans.get("link", ""), placeholder="https://...")
-        if ans.get("file_name"): st.info(f"📁 현재 등록된 파일: {ans.get('file_name')}")
-        file_val = st.file_uploader("📂 첨부 파일 업로드 (새 파일을 올리면 기존 파일이 대체됩니다)")
-        
-        if st.form_submit_button("제출 및 저장하기", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            if category not in data[user_key]: data[user_key][category] = {}
-            new_data = {"text": text_val, "link": link_val, "file_path": ans.get("file_path", ""), "file_name": ans.get("file_name", "")}
-            if file_val is not None:
-                safe_filename = f"{user_key}_{category}_{q_id}_{file_val.name}".replace("/", "_").replace("\\", "_")
-                file_path = os.path.join(UPLOAD_DIR, safe_filename)
-                with open(file_path, "wb") as f: f.write(file_val.getvalue())
-                new_data["file_path"] = file_path; new_data["file_name"] = file_val.name
-            data[user_key][category][q_id] = new_data
-            save_json(DATA_FILE, data)
-            st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
-
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role):
-    st.header("🎯 [학생-거점학교] 주제 탐구 캠프 (26-하계방학)")
+    st.header("🎯 [학생-호계고-거점학교] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
     st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
     schedule_data = [
@@ -435,19 +409,20 @@ def render_camp_overview(current_role):
     col1, col2 = st.columns(2)
     with col1:
         with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
-            st.markdown("- [모둠 구성 확인하기 (구글 문서)](#)")
-            st.markdown("- [ 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
-            st.markdown("- [사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
+            st.markdown("- [🔗 모둠 구성 확인하기 (구글 문서)](#)")
+            st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
+            st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
+            st.markdown("- [🔗 신정고 캠프 학생 결과물 모음](https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client)")
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
                 if st.button(f"📄 {act}", use_container_width=True):
                     st.session_state.current_page = act; st.rerun()
     with col2:
-        with st.expander("📝 대학 전공 가이드북 링크", expanded=True):
-            st.markdown("[ 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
-        with st.expander("📝 만족도 조사 설문 링크 (QR 포함)", expanded=True):
-            st.markdown("[캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
+        with st.expander("📚 대학 전공 가이드북 링크", expanded=True):
+            st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
+        with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
+            st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
             qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
             if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
 
@@ -456,8 +431,8 @@ st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
 st.markdown("""
 <style>
-/* 1. 제출 버튼 (폼 안의 제출 버튼) - 진한 빨간색 및 크기 확대 */
-[data-testid="stFormSubmitButton"] button {
+/* 1. 제출 버튼 (폼 안의 primary 버튼) - 진한 빨간색 및 크기 확대 */
+button[kind="primaryFormSubmit"], button[kind="primary"] {
     background-color: #FF4B4B !important;
     color: white !important;
     font-size: 22px !important;
@@ -468,7 +443,7 @@ st.markdown("""
     min-height: 60px !important;
     width: 100% !important;
 }
-[data-testid="stFormSubmitButton"] button p {
+button[kind="primaryFormSubmit"] p, button[kind="primary"] p {
     font-size: 22px !important;
     font-weight: 900 !important;
     color: white !important;
@@ -550,15 +525,15 @@ else:
     
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
-        reg_role = st.sidebar.selectbox("유형", ["학생", "교사"])
+        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
         if reg_role == "학생": 
-            reg_school = st.sidebar.text_input("소속 학교")
+            reg_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
             reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
         else: 
             reg_school = "교사소속"; reg_class = "교사"
             
-        reg_id = st.sidebar.text_input("학번")
-        reg_name = st.sidebar.text_input("이름")
+        reg_id = st.sidebar.text_input("학번/ID 입력")
+        reg_name = st.sidebar.text_input("이름 입력")
         reg_pw = st.sidebar.text_input("비밀번호", type="password")
         
         if st.sidebar.button("가입 신청", type="primary", use_container_width=True):
@@ -572,7 +547,7 @@ else:
                 
     elif auth_choice == "로그인":
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사"])
-        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교")
+        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교", value="호계고등학교")
         else: login_school = ""
             
         input_id = st.sidebar.text_input("학번/ID")
@@ -624,7 +599,6 @@ else:
             elif act_name == ACTIVITIES[6]: render_activity7_form(current_user_key)
             elif act_name == ACTIVITIES[7]: render_activity8_form(current_user_key)
             elif act_name == ACTIVITIES[8]: render_activity9_form(current_user_key)
-            else: render_submission_form(current_user_key, act_name, "content", f"{act_name} 제출란")
         else: st.warning("교사/관리자는 메인 화면의 '제출 모니터링 탭'을 이용해주세요.")
         
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -644,7 +618,6 @@ else:
                     st.markdown("---")
                     questions = app_config["questions"].get(tab_name, [])
                     
-                    # 💡 [핵심 변경] 차시별 제출 폼을 텍스트 전용으로 바꾸고 하나로 통합 (제출버튼 1개)
                     with st.form(key=f"form_{current_user_key}_{tab_name}"):
                         st.caption("아래 질문들에 대한 답변을 텍스트로 작성한 후, 맨 아래의 [제출 및 저장하기] 버튼을 눌러주세요.")
                         ans_dict = {}
