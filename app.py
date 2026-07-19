@@ -51,15 +51,24 @@ def save_json(file_path, data):
 def init_system():
     users = load_json(USERS_FILE, {})
     load_json(DATA_FILE, {})
+    
+    # 💡 [업데이트] 1~8차시 기본 탭 생성 및 3가지 고정 질문 세팅
+    default_tabs = [f"{i}차시" for i in range(1, 9)]
+    default_pdfs = {f"{i}차시": f"session{i}.pdf" for i in range(1, 9)}
+    default_questions_template = [
+        {"id": "q1", "label": "1. 오늘 배운 핵심 내용을 요약해보세요."},
+        {"id": "q2", "label": "2. 이번 차시에서 가장 흥미로웠던 점은 무엇인가요?"},
+        {"id": "q3", "label": "3. 질문이나 더 알아보고 싶은 점을 적어주세요."}
+    ]
+    default_questions = {tab: default_questions_template.copy() for tab in default_tabs}
+    
     default_config = {
-        "tabs": ["1일차_1차시", "2일차_1차시"],
-        "pdfs": {"1일차_1차시": "session1_1.pdf", "2일차_1차시": "session2_1.pdf"},
-        "questions": {
-            "1일차_1차시": [{"id": "q1", "label": "탐구 주제 및 목차 설계 (텍스트, 파일, 링크 중 자유 제출)"}],
-            "2일차_1차시": [{"id": "q1", "label": "보고서 초안 제출"}]
-        },
+        "tabs": default_tabs,
+        "pdfs": default_pdfs,
+        "questions": default_questions,
         "materials": [] 
     }
+    
     current_config = load_json(CONFIG_FILE, default_config)
     if "materials" not in current_config:
         current_config["materials"] = []
@@ -100,7 +109,6 @@ def render_activity1_form(user_key):
         st.markdown("<div style='background-color: #fff9e6; padding: 10px; border-radius: 5px;'>내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?</div>", unsafe_allow_html=True)
         step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
-        # 💡 [핵심 반영] 제출 버튼에 명시적인 type="primary" 부여하여 색상 적용
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'), "step3": step3_val}
@@ -348,32 +356,6 @@ def render_activity9_form(user_key):
             data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
             save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
 
-def render_submission_form(user_key, category, q_id, q_label):
-    data = load_json(DATA_FILE, {})
-    ans = data.get(user_key, {}).get(category, {}).get(q_id, {})
-    if isinstance(ans, str): ans = {"text": ans, "link": "", "file_name": "", "file_path": ""}
-        
-    with st.form(key=f"form_{user_key}_{category}_{q_id}"):
-        st.markdown(f"**{q_label}**")
-        st.caption("텍스트 입력, 외부 링크 주소, 파일 첨부 중 원하는 방식을 하나 이상 선택하여 제출하세요.")
-        text_val = st.text_area("📝 내용 작성", value=ans.get("text", ""), height=150)
-        link_val = st.text_input("🔗 관련 링크(URL) 제출", value=ans.get("link", ""), placeholder="https://...")
-        if ans.get("file_name"): st.info(f"📁 현재 등록된 파일: {ans.get('file_name')}")
-        file_val = st.file_uploader("📂 첨부 파일 업로드 (새 파일을 올리면 기존 파일이 대체됩니다)")
-        
-        if st.form_submit_button("제출 및 저장하기", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            if category not in data[user_key]: data[user_key][category] = {}
-            new_data = {"text": text_val, "link": link_val, "file_path": ans.get("file_path", ""), "file_name": ans.get("file_name", "")}
-            if file_val is not None:
-                safe_filename = f"{user_key}_{category}_{q_id}_{file_val.name}".replace("/", "_").replace("\\", "_")
-                file_path = os.path.join(UPLOAD_DIR, safe_filename)
-                with open(file_path, "wb") as f: f.write(file_val.getvalue())
-                new_data["file_path"] = file_path; new_data["file_name"] = file_val.name
-            data[user_key][category][q_id] = new_data
-            save_json(DATA_FILE, data)
-            st.toast("💾 제출 자료가 성공적으로 저장되었습니다!")
-
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role):
     st.header("🎯 [학생-호계고-거점학교] 주제 탐구 캠프 (26-하계방학)")
@@ -570,7 +552,6 @@ else:
                     else: st.sidebar.error("❌ 가입하신 계정 유형(학생/교사)이 다릅니다.")
                 else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
-# 💡 [사이드바 푸터] 크기 살짝 축소하여 컴팩트하게 조정
 st.sidebar.markdown("---")
 st.sidebar.markdown("<div style='text-align: center; color: #222; font-size: 15px; font-weight: 900;'>🧑‍💻 만든 이:<br><span style='font-size: 20px; color: #000;'>G.E.M.S</span><br><span style='font-size: 13px;'>(울산교육청 진학지원단)</span></div>", unsafe_allow_html=True)
 
@@ -600,7 +581,6 @@ else:
             elif act_name == ACTIVITIES[6]: render_activity7_form(current_user_key)
             elif act_name == ACTIVITIES[7]: render_activity8_form(current_user_key)
             elif act_name == ACTIVITIES[8]: render_activity9_form(current_user_key)
-            else: render_submission_form(current_user_key, act_name, "content", f"{act_name} 제출란")
         else: st.warning("교사/관리자는 메인 화면의 '제출 모니터링 탭'을 이용해주세요.")
         
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -619,7 +599,27 @@ else:
                     display_pdf(app_config["pdfs"].get(tab_name, f"{tab_name}.pdf"))
                     st.markdown("---")
                     questions = app_config["questions"].get(tab_name, [])
-                    for q in questions: render_submission_form(current_user_key, tab_name, q["id"], q["label"])
+                    
+                    # 💡 [핵심 변경] 차시별 제출 폼을 하나로 통합하고 텍스트 칸만 렌더링
+                    with st.form(key=f"form_{current_user_key}_{tab_name}"):
+                        st.caption("아래 질문들에 대한 답변을 텍스트로 작성한 후, 맨 아래의 [제출 및 저장하기] 버튼을 눌러주세요.")
+                        ans_dict = {}
+                        for q in questions:
+                            q_id = q["id"]
+                            q_label = q["label"]
+                            ans_data = learning_data.get(current_user_key, {}).get(tab_name, {}).get(q_id, {})
+                            existing_text = ans_data.get("text", "") if isinstance(ans_data, dict) else ans_data
+                            st.markdown(f"**{q_label}**")
+                            ans_dict[q_id] = st.text_area("내용 작성", value=existing_text, height=150, key=f"text_{current_user_key}_{tab_name}_{q_id}", label_visibility="collapsed")
+                            st.markdown("<br>", unsafe_allow_html=True)
+
+                        if st.form_submit_button("제출 및 저장하기", type="primary"):
+                            if current_user_key not in learning_data: learning_data[current_user_key] = {}
+                            if tab_name not in learning_data[current_user_key]: learning_data[current_user_key][tab_name] = {}
+                            for q_id, text_val in ans_dict.items():
+                                learning_data[current_user_key][tab_name][q_id] = {"text": text_val, "link": "", "file_name": "", "file_path": ""}
+                            save_json(DATA_FILE, learning_data)
+                            st.toast(f"💾 {tab_name} 자료가 성공적으로 저장되었습니다!")
 
         elif current_role in ["교사", "관리자"]:
             st.title(f"🛠️ {current_role} 대시보드")
@@ -920,12 +920,10 @@ else:
                                 for q in app_config["questions"].get(t_name, []):
                                     ans = student_answers.get(t_name, {}).get(q["id"], {})
                                     if isinstance(ans, str): ans = {"text": ans} 
-                                    if ans.get("text") or ans.get("link") or ans.get("file_name"):
+                                    if ans.get("text") or ans.get("link"):
                                         st.markdown(f"**[{t_name}] Q. {q.get('label', '')}**")
                                         if ans.get("text"): st.write(f"📝 {ans['text']}")
                                         if ans.get("link"): st.write(f"🔗 {ans['link']}")
-                                        if ans.get("file_path") and os.path.exists(ans['file_path']):
-                                            with open(ans['file_path'], "rb") as f: st.download_button(f"📥 {ans['file_name']} 다운로드", f, file_name=ans['file_name'], key=f"dl_{selected_student}_{q['id']}")
 
                     elif view_mode == "📅 항목별(활동지/차시) 전체 현황 (엑셀 다운로드)":
                         combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
@@ -1134,16 +1132,6 @@ else:
                             df_csv = pd.DataFrame(csv_data)
                             st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
-                        elif selected_view in ACTIVITIES:
-                            q_summary_data = []
-                            for s_uid in student_list:
-                                ans = learning_data.get(s_uid, {}).get(selected_view, {}).get("content", {})
-                                if isinstance(ans, str): ans = {"text": ans}
-                                q_summary_data.append({"학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid].get("name", ""), "입력 텍스트": ans.get("text", "-"), "제출 링크": ans.get("link", "-"), "첨부 파일명": ans.get("file_name", "-")})
-                            df_q = pd.DataFrame(q_summary_data)
-                            st.dataframe(df_q, use_container_width=True, hide_index=True)
-                            st.download_button(f"📊 엑셀(CSV) 다운로드 ({filter_class})", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"{selected_view}_{filter_class}_결과.csv", mime='text/csv')
-                            
                         elif selected_view in app_config["tabs"]:
                             for q in app_config["questions"].get(selected_view, []):
                                 st.markdown(f"##### ❓ {q.get('label', '')}")
@@ -1151,7 +1139,7 @@ else:
                                 for s_uid in student_list:
                                     ans = learning_data.get(s_uid, {}).get(selected_view, {}).get(q["id"], {})
                                     if isinstance(ans, str): ans = {"text": ans}
-                                    q_summary_data.append({"학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid].get("name", ""), "입력 텍스트": ans.get("text", "-"), "제출 링크": ans.get("link", "-"), "첨부 파일명": ans.get("file_name", "-")})
+                                    q_summary_data.append({"학교": all_users[s_uid].get("school", "-"), "반": all_users[s_uid].get("class_group", "-"), "학번": all_users[s_uid].get("id", s_uid.split('_')[-1]), "이름": all_users[s_uid].get("name", ""), "입력 텍스트": ans.get("text", "-")})
                                 df_q = pd.DataFrame(q_summary_data)
                                 st.dataframe(df_q, use_container_width=True, hide_index=True)
                                 st.download_button(f"📊 문항 데이터 다운로드 ({filter_class})", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"{selected_view}_{filter_class}_결과.csv", mime='text/csv', key=f"csv_{q['id']}")
