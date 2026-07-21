@@ -377,7 +377,7 @@ def render_activity9_form(user_key):
 def render_camp_overview(current_role, current_hub):
     st.header(f"🎯 [거점: {current_hub}] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
-    st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
+    st.subheader("🗓️ 주요 일정")
     schedule_data = [
         ["1일차", "1 (09:00~10:40)", "학생부 종합 전형과 탐구 역량의 이해", "우수 기록 사례 분석 및 인공지능 탐색 툴 활용법 익히기"],
         ["1일차", "2 (11:00~12:40)", "학과 안내서(가이드북)를 활용한 나의 학생부 분석", "학과별 요구 역량 파악 및 개인별 학생부 강점·보완점 분석 활동"],
