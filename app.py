@@ -16,7 +16,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 CLASS_GROUPS = ["1반", "2반", "3반", "4반"]
 HUB_SCHOOLS = ["호계고등학교", "함월고등학교", "성광여자고등학교"]
 
-# 💡 [관리자 계정 세팅]
+# 관리자 계정 세팅
 ADMIN_ACCOUNTS = {
     "admin": {"pw": "admin00", "name": "정현경", "school": "울산여자고등학교"},
     "admin1": {"pw": "admin11", "name": "임종우", "school": "신선여자고등학교"},
@@ -55,7 +55,7 @@ def init_system():
     users = load_json(USERS_FILE, {})
     load_json(DATA_FILE, {})
     
-    # 💡 [핵심 해결] users.json에 옛날 정보가 남아있다면 하드코딩된 정확한 정보로 무조건 강제 덮어쓰기
+    # users.json 관리자 정보 강제 덮어쓰기 (업데이트)
     for adm_id, adm_info in ADMIN_ACCOUNTS.items():
         users[adm_id] = {
             "id": adm_id,
@@ -65,7 +65,7 @@ def init_system():
             "school": adm_info["school"],
             "class_group": "관리자",
             "approved": True,
-            "hub_school": "전체" # 관리자는 거점 무관하게 표시되도록 설정
+            "hub_school": "전체" 
         }
     save_json(USERS_FILE, users)
     
@@ -422,12 +422,13 @@ def render_camp_overview(current_role, current_hub):
                     else: st.markdown(f"🔒 **{mat['title']}** (학생 다운로드 제한 자료)")
         st.markdown("---")
 
+    link_style = "font-size: 18px; font-weight: bold; color: #0056b3; text-decoration: none; display: block; margin-bottom: 10px;"
     col1, col2 = st.columns(2)
     with col1:
         with st.expander("👥 캠프 운영 관련 안내", expanded=True):
-            st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
-            st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://docs.google.com/forms/d/1h7pZTzvwaWM0Hcbz_nOBtgjMdO3fPU4rZkVgkpeDpWo/edit)")
-            st.markdown("- [🔗 신정고 캠프 학생 결과물 모음](https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client)")
+            st.markdown(f"<a href='https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11' target='_blank' style='{link_style}'>🔗 캠프 사전 안내 노션 사이트</a>", unsafe_allow_html=True)
+            st.markdown(f"<a href='https://docs.google.com/forms/d/1h7pZTzvwaWM0Hcbz_nOBtgjMdO3fPU4rZkVgkpeDpWo/edit' target='_blank' style='{link_style}'>🔗 사전 설문조사 [구글 폼]</a>", unsafe_allow_html=True)
+            st.markdown(f"<a href='https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client' target='_blank' style='{link_style}'>🔗 신정고 캠프 학생 결과물 모음</a>", unsafe_allow_html=True)
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
@@ -435,16 +436,16 @@ def render_camp_overview(current_role, current_hub):
                     st.session_state.current_page = act; st.rerun()
     with col2:
         with st.expander("📚 대학 전공 가이드북 링크", expanded=True):
-            st.markdown("[📁 대학 전공 가이드북 구글 드라이브 폴더 열기](https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing)")
+            st.markdown(f"<a href='https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing' target='_blank' style='{link_style}'>📁 대학 전공 가이드북 구글 드라이브 폴더 열기</a>", unsafe_allow_html=True)
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
-            st.markdown("[🔗 캠프 만족도 조사 참여하기 (Google Forms)](https://forms.gle/kqjWnsTE65Jf8QCS6)")
+            st.markdown(f"<a href='https://forms.gle/kqjWnsTE65Jf8QCS6' target='_blank' style='{link_style}'>🔗 캠프 만족도 조사 참여하기 (Google Forms)</a>", unsafe_allow_html=True)
             qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
             if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
 
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
-# 💡 [CSS 완벽 우회 적용] 에러를 일으키지 않고 CSS로만 빨간색 제출 버튼을 완벽하게 디자인합니다.
+# 💡 [CSS 전면 업데이트] 폰트 크기 증대, 색상 명확화, 에러 없는 버튼 스타일링
 st.markdown("""
 <style>
 /* 1. 제출 버튼 (폼 안의 기본 primary 버튼을 진한 빨간색으로 변경) */
@@ -495,7 +496,14 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
     border: 2px solid #999 !important;
 }
 
-/* 4. 표(Data Editor) 디자인 시인성 대폭 강화 (강제 검은색/굵게) */
+/* 4. 활동지 이동 버튼 글씨 검정색 & 진하게 */
+button[kind="secondary"] p {
+    color: #000000 !important;
+    font-weight: 900 !important;
+    font-size: 16px !important;
+}
+
+/* 5. 표(Data Editor) 디자인 시인성 대폭 강화 (강제 검은색/굵게) */
 [data-testid="stDataFrame"] {
     border: 2px solid #333 !important;
     border-radius: 5px;
