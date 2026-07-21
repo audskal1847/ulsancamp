@@ -530,7 +530,7 @@ else:
         reg_hub = st.sidebar.selectbox("거점학교 선택", HUB_SCHOOLS)
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
         if reg_role == "학생": 
-            reg_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 무룡고등학교")
+            reg_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 호계고등학교")
             reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
         else: 
             reg_school = "교사소속"; reg_class = "교사"
@@ -552,7 +552,7 @@ else:
         # 💡 [핵심] 로그인 시 거점학교 선택 추가
         login_hub = st.sidebar.selectbox("접속할 거점학교", HUB_SCHOOLS)
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사(관리자)"])
-        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 무룡고등학교")
+        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 호계고등학교")
         else: login_school = ""
             
         input_id = st.sidebar.text_input("학번/ID")
