@@ -201,6 +201,18 @@ def render_activity2_form(user_key):
         st.markdown("---")
         
         st.markdown("#### [6단계] AI 멘토에게 점검받기")
+        st.markdown("내가 세운 전략이 논리적이고 고등학생 수준에서 수행 가능한지 AI에게 물어보고 부족한 점을 보완하세요.")
+        st.markdown("**1) 아래 프롬프트의 대괄호 안을 나의 내용으로 채워서 AI에게 질문해 보세요.**")
+        st.markdown("""
+        <div style='background-color: #f0f4f8; padding: 20px; border-radius: 8px; border: 1px solid #d0d7de; color: #000; font-size: 16px; font-style: normal; font-weight: 600; line-height: 1.6;'>
+        나는 <b>[관련 교과목]</b>의 <b>[핵심 개념]</b>을 바탕으로 <b>[나의 탐구 질문]</b>을 탐구하려고 해. 접근 전략으로는 <b>[선택한 전략]</b>을 사용할 계획이야.<br><br>
+        이 질문이 명확하고 탐구할 가치가 있는지 평가해 줘.<br>
+        고등학생이 실제로 조사·실험할 수 있는 범위인지, 줄이거나 보완할 점이 있으면 알려 줘.<br>
+        참고할 만한 개념이나 자료의 방향을 추천해 줘.
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
         step6 = st.text_area("2) AI의 조언 중 내가 반영할 점:", value=ans.get("step6", ""))
         st.markdown("---")
         
