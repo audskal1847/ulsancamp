@@ -37,6 +37,9 @@ ACTIVITIES = [
     "[활동지9] 심화탐구 후속 활동 계획: 독서 연계 & 대입 로드맵"
 ]
 
+# 💡 [핵심] 모든 활동지 안내 문구의 디자인을 100% 동일하게 통일시키는 템플릿
+INFO_BOX = "<div style='background-color: #f0f4f8; padding: 15px; border-radius: 8px; font-size: 17px; font-weight: 600; color: #222; margin-bottom: 15px; border-left: 5px solid #0056b3; line-height: 1.5;'>{}</div>"
+
 # --- [2] 데이터 입출력 및 초기화 함수 ---
 def load_json(file_path, default_value):
     if not os.path.exists(file_path):
@@ -55,7 +58,7 @@ def init_system():
     users = load_json(USERS_FILE, {})
     load_json(DATA_FILE, {})
     
-    # users.json 관리자 정보 강제 덮어쓰기 (업데이트)
+    # users.json 관리자 정보 강제 덮어쓰기
     for adm_id, adm_info in ADMIN_ACCOUNTS.items():
         users[adm_id] = {
             "id": adm_id,
@@ -87,7 +90,6 @@ def init_system():
     }
     
     current_config = load_json(CONFIG_FILE, default_config)
-    
     needs_update = False
     if current_config.get("tabs") != default_tabs:
         current_config["tabs"] = default_tabs
@@ -118,7 +120,7 @@ def display_pdf(file_path):
 def render_activity1_form(user_key):
     category = ACTIVITIES[0]
     data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
-    st.markdown("<div style='background-color: #fff9e6; padding: 15px; border-radius: 5px; font-weight: bold;'>전공 가이드북을 활용하여 진학을 희망하는 학과의 핵심 내용 요소를 추출하고 이를 바탕으로 자신의 학교생활기록부의 탐구 활동을 분석/분류한다.</div><br>", unsafe_allow_html=True)
+    st.markdown(INFO_BOX.format("전공 가이드북을 활용하여 진학을 희망하는 학과의 핵심 내용 요소를 추출하고 이를 바탕으로 자신의 학교생활기록부의 탐구 활동을 분석/분류한다."), unsafe_allow_html=True)
     with st.form(key=f"form_act1_{user_key}"):
         st.markdown("#### [1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기")
         default_df1 = pd.DataFrame([{"학과/전공명": "", "핵심 내용 요소": ""} for _ in range(4)])
@@ -139,7 +141,7 @@ def render_activity1_form(user_key):
         else: st.info("💡 [2단계-예시] 희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.")
         st.markdown("---")
         st.markdown("#### [3단계] 이번 특강을 통해 탐구하고 싶은 내용 영역 또는 문제 인식(주제 찾기)")
-        st.markdown("<div style='background-color: #fff9e6; padding: 10px; border-radius: 5px;'>내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?</div>", unsafe_allow_html=True)
+        st.markdown(INFO_BOX.format("내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?"), unsafe_allow_html=True)
         step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
@@ -151,10 +153,10 @@ def render_activity2_form(user_key):
     category = ACTIVITIES[1]
     data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
     st.markdown("### 교과서 속 지식을 세상의 해답으로 바꾸는 나만의 탐구 여정")
-    st.markdown("<div style='background-color: #f8f9fa; padding: 15px; border-radius: 5px;'><i>이 활동지는 여러 주제를 나열하는 것이 아니라, <b>하나의 탐구 주제를 스스로 만들어 완성</b>하기 위한 것입니다. 1단계부터 순서대로 채워 나가면 마지막에 나만의 탐구 계획서가 완성됩니다. 각 단계는 앞 단계의 답을 이어받아 점점 구체화되도록 설계되어 있으니, 건너뛰지 말고 차례대로 작성해 보세요.</i></div><br>", unsafe_allow_html=True)
+    st.markdown(INFO_BOX.format("이 활동지는 여러 주제를 나열하는 것이 아니라, <b>하나의 탐구 주제를 스스로 만들어 완성</b>하기 위한 것입니다. 1단계부터 순서대로 채워 나가면 마지막에 나만의 탐구 계획서가 완성됩니다. 각 단계는 앞 단계의 답을 이어받아 점점 구체화되도록 설계되어 있으니, 건너뛰지 말고 차례대로 작성해 보세요."), unsafe_allow_html=True)
     with st.form(key=f"form_act2_{user_key}"):
         st.markdown("#### [1단계] 관심에서 출발하기")
-        st.markdown("<i>최근 궁금했던 것, 불편함을 느꼈던 것, 또는 수업이나 독서 중 더 알고 싶었던 것을 자유롭게 적어 봅니다.</i>", unsafe_allow_html=True)
+        st.markdown(INFO_BOX.format("최근 궁금했던 것, 불편함을 느꼈던 것, 또는 수업이나 독서 중 더 알고 싶었던 것을 자유롭게 적어 봅니다."), unsafe_allow_html=True)
         step1_1 = st.text_input("(1) 내가 관심 있는 것 / 궁금했던 현상:", value=ans.get("step1_1", ""))
         opts1_2 = ["수업이나 책을 보다가 생긴 의문을 파고들고 싶어서 (지적호기심)", "배운 원리를 실생활 문제(사회 문제) 해결에 직접 적용해 보고 싶어서 (문제해결)", "이전에 했던 탐구에서 남은 궁금증이나 한계를 더 발전시키고 싶어서 (연계 및 심화)"]
         step1_2 = st.radio("(2) 이 관심이 생긴 계기 (하나만 선택)", opts1_2, index=opts1_2.index(ans.get("step1_2", opts1_2[0])))
@@ -166,7 +168,7 @@ def render_activity2_form(user_key):
         st.markdown("---")
         
         st.markdown("#### [2단계] 교과 개념에 닻 내리기: 내 관심사를 수업에서 배운 원리와 연결하기")
-        st.markdown("<div style='background-color: #e8f4f8; padding: 10px; border-radius: 5px;'><i>좋은 탐구는 단순한 검색이 아니라 배운 개념 위에서 출발합니다. 과목 이름만 적지 말고, 배운 핵심 개념 하나를 구체적으로 적는 것이 중요합니다.</i></div>", unsafe_allow_html=True)
+        st.markdown(INFO_BOX.format("좋은 탐구는 단순한 검색이 아니라 배운 개념 위에서 출발합니다. 과목 이름만 적지 말고, 배운 핵심 개념 하나를 구체적으로 적는 것이 중요합니다."), unsafe_allow_html=True)
         st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
         default_df2 = pd.DataFrame([{"구분": "관련 교과목, 단원", "내용": "(예: 확률과 통계 - 통계적 추정)"}, {"구분": "수업에서 배운 핵심 개념", "내용": "(예: 표본 조사에서의 신뢰구간과 오차)"}, {"구분": "이 개념이 내 관심사와 연결되는 지점", "내용": ""}])
         df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
@@ -188,7 +190,7 @@ def render_activity2_form(user_key):
         st.markdown("---")
         
         st.markdown("#### [4단계] 막연한 주제를 학술적 질문으로 바꾸기")
-        st.markdown("<div style='background-color: #e8f4f8; padding: 10px; border-radius: 5px;'><i>좋은 탐구는 좋은 질문에서 시작합니다. 아래 여섯 개의 질문 렌즈 중 딱 하나를 골라, 내 주제를 탐구 가능한 질문으로 바꿔 봅니다.</i></div>", unsafe_allow_html=True)
+        st.markdown(INFO_BOX.format("좋은 탐구는 좋은 질문에서 시작합니다. 아래 여섯 개의 질문 렌즈 중 딱 하나를 골라, 내 주제를 탐구 가능한 질문으로 바꿔 봅니다."), unsafe_allow_html=True)
         opts4_1 = ["1. 원인과 결과", "2. 비교와 대조", "3. 평가와 가치", "4. 분류와 특징", "5. 변화 과정", "6. 기타"]
         step4_1 = st.selectbox("1) 선택한 렌즈:", opts4_1, index=opts4_1.index(ans.get("step4_1", opts4_1[0])))
         step4_2 = st.text_input("2) 완성한 나의 핵심 탐구 질문:", value=ans.get("step4_2", ""))
@@ -201,13 +203,12 @@ def render_activity2_form(user_key):
         st.markdown("---")
         
         st.markdown("#### [6단계] AI 멘토에게 점검받기")
-        st.markdown("내가 세운 전략이 논리적이고 고등학생 수준에서 수행 가능한지 AI에게 물어보고 부족한 점을 보완하세요.")
+        st.markdown(INFO_BOX.format("내가 세운 전략이 논리적이고 고등학생 수준에서 수행 가능한지 AI에게 물어보고 부족한 점을 보완하세요."), unsafe_allow_html=True)
         st.markdown("**1) 아래 프롬프트의 대괄호 안을 나의 내용으로 채워서 AI에게 질문해 보세요.**")
         
-        # 💡 HTML을 모두 지우고 Streamlit 전용 정보창(st.info) 적용 -> 글꼴/크기 에러 원천 차단!
-        st.info("나는 [관련 교과목]의 [핵심 개념]을 바탕으로 [나의 탐구 질문]을 탐구하려고 해. 접근 전략으로는 [선택한 전략]을 사용할 계획이야.\n\n이 질문이 명확하고 탐구할 가치가 있는지 평가해 줘.\n고등학생이 실제로 조사·실험할 수 있는 범위인지, 줄이거나 보완할 점이 있으면 알려 줘.\n참고할 만한 개념이나 자료의 방향을 추천해 줘.")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
+        # 💡 [핵심 해결] 들여쓰기 꼬임 방지를 위해 1줄로 묶어 처리한 안전한 프롬프트 박스
+        prompt_box = "<div style='background-color: #fff9e6; padding: 20px; border-radius: 8px; border: 1px solid #e0d0a0; color: #222; font-size: 17px; font-style: normal; font-weight: 600; line-height: 1.6; margin-bottom: 15px;'>👉 <b>[AI 프롬프트 예시]</b><br><br>나는 <b>[관련 교과목]</b>의 <b>[핵심 개념]</b>을 바탕으로 <b>[나의 탐구 질문]</b>을 탐구하려고 해. 접근 전략으로는 <b>[선택한 전략]</b>을 사용할 계획이야.<br><br>이 질문이 명확하고 탐구할 가치가 있는지 평가해 줘.<br>고등학생이 실제로 조사·실험할 수 있는 범위인지, 줄이거나 보완할 점이 있으면 알려 줘.<br>참고할 만한 개념이나 자료의 방향을 추천해 줘.</div>"
+        st.markdown(prompt_box, unsafe_allow_html=True)
         
         step6 = st.text_area("2) AI의 조언 중 내가 반영할 점:", value=ans.get("step6", ""))
         st.markdown("---")
@@ -401,7 +402,7 @@ def render_activity9_form(user_key):
 def render_camp_overview(current_role, current_hub):
     st.header(f"🎯 [거점: {current_hub}] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
-    st.subheader("🗓️ 캠프 일정")
+    st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
     schedule_data = [
         ["1일차", "1 (09:00~10:40)", "학생부 종합 전형과 탐구 역량의 이해", "우수 기록 사례 분석 및 인공지능 탐색 툴 활용법 익히기"],
         ["1일차", "2 (11:00~12:40)", "학과 안내서(가이드북)를 활용한 나의 학생부 분석", "학과별 요구 역량 파악 및 개인별 학생부 강점·보완점 분석 활동"],
@@ -433,9 +434,10 @@ def render_camp_overview(current_role, current_hub):
     link_style = "font-size: 18px; font-weight: bold; color: #0056b3; text-decoration: none; display: block; margin-bottom: 10px;"
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 캠프 운영 관련 안내", expanded=True):
+        with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
+            st.markdown(f"<a href='#' target='_blank' style='{link_style}'>🔗 모둠 구성 확인하기 (구글 문서)</a>", unsafe_allow_html=True)
             st.markdown(f"<a href='https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11' target='_blank' style='{link_style}'>🔗 캠프 사전 안내 노션 사이트</a>", unsafe_allow_html=True)
-            st.markdown(f"<a href='https://docs.google.com/forms/d/1h7pZTzvwaWM0Hcbz_nOBtgjMdO3fPU4rZkVgkpeDpWo/edit' target='_blank' style='{link_style}'>🔗 사전 설문조사 [구글 폼]</a>", unsafe_allow_html=True)
+            st.markdown(f"<a href='https://forms.gle/4Co5GLdD3M6KEVcs8' target='_blank' style='{link_style}'>🔗 사전 설문조사 [구글 폼]</a>", unsafe_allow_html=True)
             st.markdown(f"<a href='https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client' target='_blank' style='{link_style}'>🔗 신정고 캠프 학생 결과물 모음</a>", unsafe_allow_html=True)
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
@@ -453,7 +455,7 @@ def render_camp_overview(current_role, current_hub):
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
-# 💡 [CSS 전면 업데이트] 폰트 크기 증대, 색상 명확화, 에러 없는 버튼 스타일링
+# 💡 [핵심 반영 1] 최적의 폰트 사이즈(17px)와 진하기(600)로 모든 마크다운 텍스트 강제 통일
 st.markdown("""
 <style>
 /* 1. 제출 버튼 (폼 안의 기본 primary 버튼을 진한 빨간색으로 변경) */
@@ -492,16 +494,18 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
 }
 .back-btn-wrapper { display: none; }
 
-/* 3. 학생 차시 텍스트 입력창 가독성 대폭 향상 */
+/* 3. 학생 차시 텍스트 입력창 가독성 최적화 (17px / 600굵기) */
 .stMarkdown p {
-    font-size: 20px !important;
-    color: #000000 !important;
-    font-weight: 800 !important;
+    font-size: 17px !important;
+    color: #222222 !important;
+    font-weight: 600 !important;
+    line-height: 1.6 !important;
 }
 .stTextArea textarea {
-    font-size: 18px !important;
+    font-size: 17px !important;
     color: #000000 !important;
-    border: 2px solid #999 !important;
+    border: 2px solid #aaa !important;
+    font-weight: 500 !important;
 }
 
 /* 4. 활동지 이동 버튼 글씨 검정색 & 진하게 */
