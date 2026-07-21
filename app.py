@@ -16,7 +16,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 CLASS_GROUPS = ["1반", "2반", "3반", "4반"]
 HUB_SCHOOLS = ["호계고등학교", "함월고등학교", "성광여자고등학교"]
 
-# 💡 [핵심 반영 1] 관리자 계정 정보 최신화
+# 💡 [관리자 계정 세팅]
 ADMIN_ACCOUNTS = {
     "admin": {"pw": "admin00", "name": "정현경", "school": "울산여자고등학교"},
     "admin1": {"pw": "admin11", "name": "임종우", "school": "신선여자고등학교"},
@@ -55,6 +55,21 @@ def init_system():
     users = load_json(USERS_FILE, {})
     load_json(DATA_FILE, {})
     
+    # 💡 [핵심 해결] users.json에 옛날 정보가 남아있다면 하드코딩된 정확한 정보로 무조건 강제 덮어쓰기
+    for adm_id, adm_info in ADMIN_ACCOUNTS.items():
+        users[adm_id] = {
+            "id": adm_id,
+            "password": adm_info["pw"],
+            "name": adm_info["name"],
+            "role": "관리자",
+            "school": adm_info["school"],
+            "class_group": "관리자",
+            "approved": True,
+            "hub_school": "전체" # 관리자는 거점 무관하게 표시되도록 설정
+        }
+    save_json(USERS_FILE, users)
+    
+    # 8차시 탭 및 3문항 자동 세팅
     default_tabs = [f"{i}차시" for i in range(1, 9)]
     default_pdfs = {f"{i}차시": f"session{i}.pdf" for i in range(1, 9)}
     default_questions_template = [
@@ -72,6 +87,7 @@ def init_system():
     }
     
     current_config = load_json(CONFIG_FILE, default_config)
+    
     needs_update = False
     if current_config.get("tabs") != default_tabs:
         current_config["tabs"] = default_tabs
@@ -88,7 +104,8 @@ def init_system():
         current_config["materials"] = []
         needs_update = True
         
-    if needs_update: save_json(CONFIG_FILE, current_config)
+    if needs_update:
+        save_json(CONFIG_FILE, current_config)
 
 def display_pdf(file_path):
     if os.path.exists(file_path):
@@ -125,7 +142,6 @@ def render_activity1_form(user_key):
         st.markdown("<div style='background-color: #fff9e6; padding: 10px; border-radius: 5px;'>내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?</div>", unsafe_allow_html=True)
         step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
-        # 💡 에러 방지를 위해 type 속성을 기본값("primary")으로 롤백, 색상은 CSS로 제어
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
             if user_key not in data: data[user_key] = {}
             data[user_key][category] = {"is_custom": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'), "step3": step3_val}
@@ -377,7 +393,7 @@ def render_activity9_form(user_key):
 def render_camp_overview(current_role, current_hub):
     st.header(f"🎯 [거점: {current_hub}] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
-    st.subheader("🗓️ 주요 일정")
+    st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
     schedule_data = [
         ["1일차", "1 (09:00~10:40)", "학생부 종합 전형과 탐구 역량의 이해", "우수 기록 사례 분석 및 인공지능 탐색 툴 활용법 익히기"],
         ["1일차", "2 (11:00~12:40)", "학과 안내서(가이드북)를 활용한 나의 학생부 분석", "학과별 요구 역량 파악 및 개인별 학생부 강점·보완점 분석 활동"],
@@ -412,7 +428,6 @@ def render_camp_overview(current_role, current_hub):
             st.markdown("- [🔗 모둠 구성 확인하기 (구글 문서)](#)")
             st.markdown("- [🔗 캠프 사전 안내 노션 사이트](https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11)")
             st.markdown("- [🔗 사전 설문조사 [구글 폼]](https://forms.gle/4Co5GLdD3M6KEVcs8)")
-            # 💡 [핵심 반영 3] 신정고 캠프 학생 결과물 모음 링크 삽입
             st.markdown("- [🔗 신정고 캠프 학생 결과물 모음](https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client)")
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
@@ -430,10 +445,10 @@ def render_camp_overview(current_role, current_hub):
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
-# 💡 [핵심 반영 2] UI 가독성 (시인성) 대폭 상향 업데이트
+# 💡 [CSS 완벽 우회 적용] 에러를 일으키지 않고 CSS로만 빨간색 제출 버튼을 완벽하게 디자인합니다.
 st.markdown("""
 <style>
-/* 1. 제출 버튼 (폼 안의 primary 버튼) - 에러 없이 100% 빨간색 적용 우회 */
+/* 1. 제출 버튼 (폼 안의 기본 primary 버튼을 진한 빨간색으로 변경) */
 [data-testid="stFormSubmitButton"] button, button[kind="primary"] {
     background-color: #FF4B4B !important;
     color: white !important;
@@ -451,7 +466,7 @@ st.markdown("""
     color: white !important;
 }
 
-/* 2. 메인 화면으로 돌아가기 버튼 (하단 단일 배치, 진한 파란색) */
+/* 2. 메인 화면으로 돌아가기 버튼 (진한 파란색 우회 적용) */
 div.element-container:has(.back-btn-wrapper) + div.element-container button {
     background-color: #0056b3 !important;
     color: white !important;
@@ -469,19 +484,16 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
 }
 .back-btn-wrapper { display: none; }
 
-/* 3. 학생 텍스트 폼 가독성 향상 (문제 해결) */
+/* 3. 학생 차시 텍스트 입력창 가독성 대폭 향상 */
 .stMarkdown p {
-    font-size: 18px !important;
-    color: #111 !important;
-    font-weight: 600 !important;
+    font-size: 20px !important;
+    color: #000000 !important;
+    font-weight: 800 !important;
 }
 .stTextArea textarea {
-    font-size: 16px !important;
-    color: #000 !important;
-    border: 1px solid #aaa !important;
-}
-.stTextArea label {
-    display: none !important; /* 불필요한 라벨 제거 */
+    font-size: 18px !important;
+    color: #000000 !important;
+    border: 2px solid #999 !important;
 }
 
 /* 4. 표(Data Editor) 디자인 시인성 대폭 강화 (강제 검은색/굵게) */
@@ -576,7 +588,6 @@ else:
         
         if st.sidebar.button("로그인", type="primary", use_container_width=True):
             if login_type == "교사(관리자)" and input_id in ADMIN_ACCOUNTS and input_pw == ADMIN_ACCOUNTS[input_id]["pw"]:
-                # 관리자 계정 로그인 성공 시
                 admin_info = ADMIN_ACCOUNTS[input_id]
                 st.session_state.logged_in = True
                 st.session_state.user_info = {"user_key": input_id, "username": input_id, "name": admin_info["name"], "role": "관리자", "school": admin_info["school"], "class_group": "관리자", "hub_school": login_hub}
@@ -645,7 +656,6 @@ else:
                     st.markdown("---")
                     questions = app_config["questions"].get(tab_name, [])
                     
-                    # 💡 [핵심 반영 4] 차시별 질문(3문항 고정) 및 텍스트 전용 + 단일 버튼 제출 폼 구현
                     with st.form(key=f"form_{current_user_key}_{tab_name}"):
                         st.markdown("<div style='color:#555; margin-bottom:10px;'>아래 질문들에 대한 답변을 텍스트로 작성한 후, 맨 아래의 <b>[제출 및 저장하기]</b> 버튼을 눌러주세요.</div>", unsafe_allow_html=True)
                         ans_dict = {}
@@ -676,7 +686,7 @@ else:
 
             with menu_tabs[1]:
                 all_users = load_json(USERS_FILE, {})
-                hub_users = {k: v for k, v in all_users.items() if v.get("hub_school", "호계고등학교") == current_hub}
+                hub_users = {k: v for k, v in all_users.items() if v.get("role") == "관리자" or v.get("hub_school", "호계고등학교") == current_hub}
                 pending_users = {k: v for k, v in hub_users.items() if not v.get("approved", True)}
                 approved_users = {k: v for k, v in hub_users.items() if v.get("approved", True)}
 
