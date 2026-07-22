@@ -262,7 +262,7 @@ def render_activity7_form(user_key): render_feedback_form(user_key, ACTIVITIES[6
 def render_activity4_form(user_key):
     category = ACTIVITIES[3]
     data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
-    st.markdown("<i>탐구 과정 중 참고하게 되는 자료 목록을 여기에 지속적으로 추가하고, 노트북LM의 소스로 활용합니다.</i>", unsafe_allow_html=True)
+    st.markdown("<i>탐구 과정 중 참고하게 되는 자료 목록을 여기에 지속적으로 추가하고, Gemini Notebook의 소스로 활용합니다.</i>", unsafe_allow_html=True)
     with st.form(key=f"form_{category}_{user_key}"):
         default_df = pd.DataFrame([{"사이트명": "", "제목": "", "내용": "", "선정이유": ""} for _ in range(5)])
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
