@@ -433,8 +433,7 @@ def render_camp_overview(current_role, current_hub):
     link_style = "font-size: 18px; font-weight: bold; color: #0056b3; text-decoration: none; display: block; margin-bottom: 10px;"
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
-            st.markdown(f"<a href='#' target='_blank' style='{link_style}'>🔗 모둠 구성 확인하기 (구글 문서)</a>", unsafe_allow_html=True)
+        with st.expander("👥 캠프 운영 관련 안내", expanded=True):
             st.markdown(f"<a href='https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11' target='_blank' style='{link_style}'>🔗 캠프 사전 안내 노션 사이트</a>", unsafe_allow_html=True)
             st.markdown(f"<a href='https://forms.gle/4Co5GLdD3M6KEVcs8' target='_blank' style='{link_style}'>🔗 사전 설문조사 [구글 폼]</a>", unsafe_allow_html=True)
             st.markdown(f"<a href='https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client' target='_blank' style='{link_style}'>🔗 신정고 캠프 학생 결과물 모음</a>", unsafe_allow_html=True)
