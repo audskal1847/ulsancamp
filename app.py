@@ -37,7 +37,7 @@ ACTIVITIES = [
     "[활동지9] 심화탐구 후속 활동 계획: 독서 연계 & 대입 로드맵"
 ]
 
-# 💡 [핵심] 모든 활동지 안내 문구의 디자인을 100% 동일하게 통일시키는 템플릿
+# 모든 활동지 안내 문구의 디자인을 100% 동일하게 통일시키는 템플릿
 INFO_BOX = "<div style='background-color: #f0f4f8; padding: 15px; border-radius: 8px; font-size: 17px; font-weight: 600; color: #222; margin-bottom: 15px; border-left: 5px solid #0056b3; line-height: 1.5;'>{}</div>"
 
 # --- [2] 데이터 입출력 및 초기화 함수 ---
@@ -206,7 +206,6 @@ def render_activity2_form(user_key):
         st.markdown(INFO_BOX.format("내가 세운 전략이 논리적이고 고등학생 수준에서 수행 가능한지 AI에게 물어보고 부족한 점을 보완하세요."), unsafe_allow_html=True)
         st.markdown("**1) 아래 프롬프트의 대괄호 안을 나의 내용으로 채워서 AI에게 질문해 보세요.**")
         
-        # 💡 [핵심 해결] 들여쓰기 꼬임 방지를 위해 1줄로 묶어 처리한 안전한 프롬프트 박스
         prompt_box = "<div style='background-color: #fff9e6; padding: 20px; border-radius: 8px; border: 1px solid #e0d0a0; color: #222; font-size: 17px; font-style: normal; font-weight: 600; line-height: 1.6; margin-bottom: 15px;'>👉 <b>[AI 프롬프트 예시]</b><br><br>나는 <b>[관련 교과목]</b>의 <b>[핵심 개념]</b>을 바탕으로 <b>[나의 탐구 질문]</b>을 탐구하려고 해. 접근 전략으로는 <b>[선택한 전략]</b>을 사용할 계획이야.<br><br>이 질문이 명확하고 탐구할 가치가 있는지 평가해 줘.<br>고등학생이 실제로 조사·실험할 수 있는 범위인지, 줄이거나 보완할 점이 있으면 알려 줘.<br>참고할 만한 개념이나 자료의 방향을 추천해 줘.</div>"
         st.markdown(prompt_box, unsafe_allow_html=True)
         
@@ -455,7 +454,7 @@ def render_camp_overview(current_role, current_hub):
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
-# 💡 [핵심 반영 1] 최적의 폰트 사이즈(17px)와 진하기(600)로 모든 마크다운 텍스트 강제 통일
+# 💡 사이드바 가독성 상향 CSS 추가
 st.markdown("""
 <style>
 /* 1. 제출 버튼 (폼 안의 기본 primary 버튼을 진한 빨간색으로 변경) */
@@ -494,7 +493,7 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
 }
 .back-btn-wrapper { display: none; }
 
-/* 3. 학생 차시 텍스트 입력창 가독성 최적화 (17px / 600굵기) */
+/* 3. 학생 차시 텍스트 입력창 가독성 최적화 */
 .stMarkdown p {
     font-size: 17px !important;
     color: #222222 !important;
@@ -515,7 +514,7 @@ button[kind="secondary"] p {
     font-size: 16px !important;
 }
 
-/* 5. 표(Data Editor) 디자인 시인성 대폭 강화 (강제 검은색/굵게) */
+/* 5. 표(Data Editor) 디자인 시인성 대폭 강화 */
 [data-testid="stDataFrame"] {
     border: 2px solid #333 !important;
     border-radius: 5px;
@@ -538,6 +537,21 @@ table td {
     color: #000000 !important;
     font-size: 16px !important;
     font-weight: 600 !important;
+}
+
+/* 💡 6. 사이드바 텍스트 크기 및 진하기 상향 (새로 추가됨) */
+[data-testid="stSidebar"] .stMarkdown p,
+[data-testid="stSidebar"] .stSelectbox label p,
+[data-testid="stSidebar"] .stTextInput label p,
+[data-testid="stSidebar"] .stRadio label p,
+[data-testid="stSidebar"] div[data-baseweb="radio"] div {
+    font-size: 17px !important;
+    font-weight: 700 !important;
+    color: #111111 !important;
+}
+[data-testid="stSidebar"] input {
+    font-size: 16px !important;
+    font-weight: 500 !important;
 }
 </style>
 """, unsafe_allow_html=True)
