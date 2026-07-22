@@ -590,7 +590,7 @@ else:
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
         reg_hub = st.sidebar.selectbox("거점학교 선택", HUB_SCHOOLS)
-        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
+        reg_role = st.sidebar.selectbox("회원가입 유형", ["학생", "교사"])
         if reg_role == "학생": 
             reg_school = st.sidebar.text_input("소속 학교(원적교)")
             reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
