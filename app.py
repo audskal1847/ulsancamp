@@ -4,6 +4,7 @@ import os
 import base64
 import pandas as pd
 import datetime
+import threading # 💡 [핵심 안전장치] 동시 접속 충돌 방지 모듈
 
 # --- [1] 파일 경로 설정 및 상수 정의 ---
 USERS_FILE = "users.json"
@@ -37,8 +38,11 @@ ACTIVITIES = [
     "[활동지9] 심화탐구 후속 활동 계획: 독서 연계 & 대입 로드맵"
 ]
 
-# 모든 활동지 안내 문구의 디자인을 100% 동일하게 통일시키는 템플릿
+# 모든 활동지 안내 문구의 디자인 템플릿
 INFO_BOX = "<div style='background-color: #f0f4f8; padding: 15px; border-radius: 8px; font-size: 17px; font-weight: 600; color: #222; margin-bottom: 15px; border-left: 5px solid #0056b3; line-height: 1.5;'>{}</div>"
+
+# 💡 [핵심 안전장치] 동시 접속 대기열 생성 (데이터 덮어쓰기 완벽 방지)
+db_lock = threading.Lock()
 
 # --- [2] 데이터 입출력 및 초기화 함수 ---
 def load_json(file_path, default_value):
@@ -47,67 +51,62 @@ def load_json(file_path, default_value):
             json.dump(default_value, f, ensure_ascii=False, indent=4)
         return default_value
     try:
-        with open(file_path, "r", encoding="utf-8") as f: return json.load(f)
-    except json.JSONDecodeError: return default_value
+        with open(file_path, "r", encoding="utf-8") as f: 
+            return json.load(f)
+    except json.JSONDecodeError: 
+        return default_value
 
 def save_json(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 def init_system():
-    users = load_json(USERS_FILE, {})
-    load_json(DATA_FILE, {})
-    
-    # users.json 관리자 정보 강제 덮어쓰기
-    for adm_id, adm_info in ADMIN_ACCOUNTS.items():
-        users[adm_id] = {
-            "id": adm_id,
-            "password": adm_info["pw"],
-            "name": adm_info["name"],
-            "role": "관리자",
-            "school": adm_info["school"],
-            "class_group": "관리자",
-            "approved": True,
-            "hub_school": "전체" 
-        }
-    save_json(USERS_FILE, users)
-    
-    # 8차시 탭 및 3문항 자동 세팅
-    default_tabs = [f"{i}차시" for i in range(1, 9)]
-    default_pdfs = {f"{i}차시": f"session{i}.pdf" for i in range(1, 9)}
-    default_questions_template = [
-        {"id": "q1", "label": "1. 오늘 배운 핵심 내용을 요약해보세요."},
-        {"id": "q2", "label": "2. 이번 차시에서 가장 흥미로웠던 점은 무엇인가요?"},
-        {"id": "q3", "label": "3. 질문이나 더 알아보고 싶은 점을 적어주세요."}
-    ]
-    default_questions = {tab: default_questions_template.copy() for tab in default_tabs}
-    
-    default_config = {
-        "tabs": default_tabs,
-        "pdfs": default_pdfs,
-        "questions": default_questions,
-        "materials": [] 
-    }
-    
-    current_config = load_json(CONFIG_FILE, default_config)
-    needs_update = False
-    if current_config.get("tabs") != default_tabs:
-        current_config["tabs"] = default_tabs
-        current_config["pdfs"] = default_pdfs
-        current_config["questions"] = default_questions
-        needs_update = True
-    else:
-        for tab in default_tabs:
-            if len(current_config["questions"].get(tab, [])) != 3:
-                current_config["questions"][tab] = default_questions_template.copy()
-                needs_update = True
-                
-    if "materials" not in current_config:
-        current_config["materials"] = []
-        needs_update = True
+    with db_lock: # 💡 초기화 시에도 락을 걸어 충돌 방지
+        users = load_json(USERS_FILE, {})
         
-    if needs_update:
-        save_json(CONFIG_FILE, current_config)
+        users_changed = False
+        for adm_id, adm_info in ADMIN_ACCOUNTS.items():
+            if adm_id not in users or users[adm_id].get("password") != adm_info["pw"] or users[adm_id].get("name") != adm_info["name"]:
+                users[adm_id] = {
+                    "id": adm_id, "password": adm_info["pw"], "name": adm_info["name"],
+                    "role": "관리자", "school": adm_info["school"], "class_group": "관리자",
+                    "approved": True, "hub_school": "전체" 
+                }
+                users_changed = True
+                
+        if users_changed:
+            save_json(USERS_FILE, users)
+        
+        default_tabs = [f"{i}차시" for i in range(1, 9)]
+        default_pdfs = {f"{i}차시": f"session{i}.pdf" for i in range(1, 9)}
+        default_questions_template = [
+            {"id": "q1", "label": "1. 오늘 배운 핵심 내용을 요약해보세요."},
+            {"id": "q2", "label": "2. 이번 차시에서 가장 흥미로웠던 점은 무엇인가요?"},
+            {"id": "q3", "label": "3. 질문이나 더 알아보고 싶은 점을 적어주세요."}
+        ]
+        default_questions = {tab: default_questions_template.copy() for tab in default_tabs}
+        
+        current_config = load_json(CONFIG_FILE, {})
+        needs_update = False
+        
+        if current_config.get("tabs") != default_tabs:
+            current_config["tabs"] = default_tabs
+            current_config["pdfs"] = default_pdfs
+            current_config["questions"] = default_questions
+            needs_update = True
+        else:
+            for tab in default_tabs:
+                if len(current_config.get("questions", {}).get(tab, [])) != 3:
+                    if "questions" not in current_config: current_config["questions"] = {}
+                    current_config["questions"][tab] = default_questions_template.copy()
+                    needs_update = True
+                    
+        if "materials" not in current_config:
+            current_config["materials"] = []
+            needs_update = True
+            
+        if needs_update:
+            save_json(CONFIG_FILE, current_config)
 
 def display_pdf(file_path):
     if os.path.exists(file_path):
@@ -119,7 +118,7 @@ def display_pdf(file_path):
 # --- [3] 활동지별 맞춤형 폼 렌더링 함수들 ---
 def render_activity1_form(user_key):
     category = ACTIVITIES[0]
-    data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
+    ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     st.markdown(INFO_BOX.format("전공 가이드북을 활용하여 진학을 희망하는 학과의 핵심 내용 요소를 추출하고 이를 바탕으로 자신의 학교생활기록부의 탐구 활동을 분석/분류한다."), unsafe_allow_html=True)
     with st.form(key=f"form_act1_{user_key}"):
         st.markdown("#### [1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기")
@@ -145,13 +144,16 @@ def render_activity1_form(user_key):
         step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            data[user_key][category] = {"is_custom": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'), "step3": step3_val}
-            save_json(DATA_FILE, data); st.toast("🎉 활동지1이 성공적으로 저장되었습니다!")
+            with db_lock: # 💡 동시 접속 완벽 보호
+                current_data = load_json(DATA_FILE, {}) 
+                if user_key not in current_data: current_data[user_key] = {}
+                current_data[user_key][category] = {"is_custom": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'), "step3": step3_val}
+                save_json(DATA_FILE, current_data)
+            st.toast("🎉 활동지1이 성공적으로 저장되었습니다!")
 
 def render_activity2_form(user_key):
     category = ACTIVITIES[1]
-    data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
+    ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     st.markdown("### 교과서 속 지식을 세상의 해답으로 바꾸는 나만의 탐구 여정")
     st.markdown(INFO_BOX.format("이 활동지는 여러 주제를 나열하는 것이 아니라, <b>하나의 탐구 주제를 스스로 만들어 완성</b>하기 위한 것입니다. 1단계부터 순서대로 채워 나가면 마지막에 나만의 탐구 계획서가 완성됩니다. 각 단계는 앞 단계의 답을 이어받아 점점 구체화되도록 설계되어 있으니, 건너뛰지 말고 차례대로 작성해 보세요."), unsafe_allow_html=True)
     with st.form(key=f"form_act2_{user_key}"):
@@ -232,28 +234,34 @@ def render_activity2_form(user_key):
         with col7: st.write(")을(를) 밝히려 한다.")
 
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            data[user_key][category] = {
-                "is_custom_act2": True, "step1_1": step1_1, "step1_2": step1_2,
-                "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'),
-                "step2_dir": step2_dir, "df3": edited_df3.to_dict('records'),
-                "step4_1": step4_1, "step4_2": step4_2, "step5_1": step5_1, "step5_2": step5_2,
-                "step6": step6, "df7": edited_df7.to_dict('records'),
-                "step7_s1": step7_s1, "step7_s2": step7_s2, "step7_s3": step7_s3
-            }
-            save_json(DATA_FILE, data); st.toast("🎉 활동지2가 성공적으로 저장되었습니다!")
+            with db_lock: # 💡 동시 접속 완벽 보호
+                current_data = load_json(DATA_FILE, {}) 
+                if user_key not in current_data: current_data[user_key] = {}
+                current_data[user_key][category] = {
+                    "is_custom_act2": True, "step1_1": step1_1, "step1_2": step1_2,
+                    "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'),
+                    "step2_dir": step2_dir, "df3": edited_df3.to_dict('records'),
+                    "step4_1": step4_1, "step4_2": step4_2, "step5_1": step5_1, "step5_2": step5_2,
+                    "step6": step6, "df7": edited_df7.to_dict('records'),
+                    "step7_s1": step7_s1, "step7_s2": step7_s2, "step7_s3": step7_s3
+                }
+                save_json(DATA_FILE, current_data)
+            st.toast("🎉 활동지2가 성공적으로 저장되었습니다!")
 
 def render_feedback_form(user_key, category, rows):
-    data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
+    ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     with st.form(key=f"form_{category}_{user_key}"):
         st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
         default_df = pd.DataFrame([{"구분": r, "피드백 내용 (구체적으로)": "", "보완 및 수정 계획": ""} for r in rows])
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
         edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["구분"], key=f"df_{category}")
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            data[user_key][category] = {"is_custom_feedback": True, "df1": edited_df.to_dict('records')}
-            save_json(DATA_FILE, data); st.toast(f"🎉 {category} 저장 완료!")
+            with db_lock:
+                current_data = load_json(DATA_FILE, {})
+                if user_key not in current_data: current_data[user_key] = {}
+                current_data[user_key][category] = {"is_custom_feedback": True, "df1": edited_df.to_dict('records')}
+                save_json(DATA_FILE, current_data)
+            st.toast(f"🎉 {category} 저장 완료!")
 
 def render_activity3_form(user_key): render_feedback_form(user_key, ACTIVITIES[2], ["참고 아이디어", "방향 제안", "함께 찾아보면 좋을 교과 키워드"])
 def render_activity6_form(user_key): render_feedback_form(user_key, ACTIVITIES[5], ["주제 선정과 교과 연결", "질문 만들기와 탐구 방법", "자료 찾기 및 내용 소화", "나만의 생각 더하기", "마무리 및 다음 단계"])
@@ -261,20 +269,23 @@ def render_activity7_form(user_key): render_feedback_form(user_key, ACTIVITIES[6
 
 def render_activity4_form(user_key):
     category = ACTIVITIES[3]
-    data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
-    st.markdown("<i>탐구 과정 중 참고하게 되는 자료 목록을 여기에 지속적으로 추가하고, Gemini Notebook의 소스로 활용합니다.</i>", unsafe_allow_html=True)
+    ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
+    st.markdown("<i>탐구 과정 중 참고하게 되는 자료 목록을 여기에 지속적으로 추가하고, 노트북LM의 소스로 활용합니다.</i>", unsafe_allow_html=True)
     with st.form(key=f"form_{category}_{user_key}"):
         default_df = pd.DataFrame([{"사이트명": "", "제목": "", "내용": "", "선정이유": ""} for _ in range(5)])
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
         edited_df = st.data_editor(df, num_rows="dynamic", hide_index=True, use_container_width=True, key=f"df_{category}")
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            data[user_key][category] = {"is_custom_refs": True, "df1": edited_df.to_dict('records')}
-            save_json(DATA_FILE, data); st.toast("🎉 저장 완료!")
+            with db_lock:
+                current_data = load_json(DATA_FILE, {})
+                if user_key not in current_data: current_data[user_key] = {}
+                current_data[user_key][category] = {"is_custom_refs": True, "df1": edited_df.to_dict('records')}
+                save_json(DATA_FILE, current_data)
+            st.toast("🎉 저장 완료!")
 
 def render_activity5_form(user_key):
     category = ACTIVITIES[4]
-    data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
+    ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     with st.form(key=f"form_act5_{user_key}"):
         st.markdown("#### 1. 기본 정보")
         c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
@@ -338,21 +349,24 @@ def render_activity5_form(user_key):
         ref_web = st.text_area("웹사이트/기사", value=ans.get("ref_web", ""), placeholder="사이트명, 기사 제목, URL, 접속일자", label_visibility="collapsed")
 
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            data[user_key][category] = {
-                "is_custom_act5": True, "info_course": info_course, "info_date": info_date, "info_school": info_school, "info_career": info_career,
-                "info_name": info_name, "info_subject": info_subject, "info_method": info_method, "info_topic": info_topic,
-                "topic_title": topic_title, "motive_1": motive_1, "motive_2": motive_2, "purpose": purpose,
-                "bg_df": edited_bg_df.to_dict('records'), "selected_methods": selected_methods, "proc_df": edited_proc_df.to_dict('records'),
-                "content_body": content_body, "result_summary": result_summary, "result_meaning": result_meaning,
-                "conclusion": conclusion, "reflection_1": reflection_1, "reflection_2": reflection_2,
-                "next_step": next_step, "ref_book": ref_book, "ref_web": ref_web
-            }
-            save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
+            with db_lock:
+                current_data = load_json(DATA_FILE, {})
+                if user_key not in current_data: current_data[user_key] = {}
+                current_data[user_key][category] = {
+                    "is_custom_act5": True, "info_course": info_course, "info_date": info_date, "info_school": info_school, "info_career": info_career,
+                    "info_name": info_name, "info_subject": info_subject, "info_method": info_method, "info_topic": info_topic,
+                    "topic_title": topic_title, "motive_1": motive_1, "motive_2": motive_2, "purpose": purpose,
+                    "bg_df": edited_bg_df.to_dict('records'), "selected_methods": selected_methods, "proc_df": edited_proc_df.to_dict('records'),
+                    "content_body": content_body, "result_summary": result_summary, "result_meaning": result_meaning,
+                    "conclusion": conclusion, "reflection_1": reflection_1, "reflection_2": reflection_2,
+                    "next_step": next_step, "ref_book": ref_book, "ref_web": ref_web
+                }
+                save_json(DATA_FILE, current_data)
+            st.toast("🎉 저장되었습니다!")
 
 def render_activity8_form(user_key):
     category = ACTIVITIES[7]
-    data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
+    ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     with st.form(key=f"form_{category}_{user_key}"):
         st.caption("※ 첫 번째 열(항목)은 양식 제목이므로 수정하지 마세요.")
         default_df = pd.DataFrame([
@@ -363,13 +377,16 @@ def render_activity8_form(user_key):
         df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
         edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["항목"], key=f"df_{category}")
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            data[user_key][category] = {"is_custom_self_eval": True, "df1": edited_df.to_dict('records')}
-            save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
+            with db_lock:
+                current_data = load_json(DATA_FILE, {})
+                if user_key not in current_data: current_data[user_key] = {}
+                current_data[user_key][category] = {"is_custom_self_eval": True, "df1": edited_df.to_dict('records')}
+                save_json(DATA_FILE, current_data)
+            st.toast("🎉 저장되었습니다!")
 
 def render_activity9_form(user_key):
     category = ACTIVITIES[8]
-    data = load_json(DATA_FILE, {}); ans = data.get(user_key, {}).get(category, {})
+    ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     with st.form(key=f"form_{category}_{user_key}"):
         st.markdown("#### 1. 꼬리에 꼬리를 무는 독서")
         st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
@@ -393,9 +410,12 @@ def render_activity9_form(user_key):
         edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["시기", "중점 목표"], key="act9_df2")
 
         if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            if user_key not in data: data[user_key] = {}
-            data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
-            save_json(DATA_FILE, data); st.toast("🎉 저장되었습니다!")
+            with db_lock:
+                current_data = load_json(DATA_FILE, {})
+                if user_key not in current_data: current_data[user_key] = {}
+                current_data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
+                save_json(DATA_FILE, current_data)
+            st.toast("🎉 저장되었습니다!")
 
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role, current_hub):
@@ -433,7 +453,8 @@ def render_camp_overview(current_role, current_hub):
     link_style = "font-size: 18px; font-weight: bold; color: #0056b3; text-decoration: none; display: block; margin-bottom: 10px;"
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 캠프 운영 관련 안내", expanded=True):
+        with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
+            st.markdown(f"<a href='#' target='_blank' style='{link_style}'>🔗 모둠 구성 확인하기 (구글 문서)</a>", unsafe_allow_html=True)
             st.markdown(f"<a href='https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11' target='_blank' style='{link_style}'>🔗 캠프 사전 안내 노션 사이트</a>", unsafe_allow_html=True)
             st.markdown(f"<a href='https://forms.gle/4Co5GLdD3M6KEVcs8' target='_blank' style='{link_style}'>🔗 사전 설문조사 [구글 폼]</a>", unsafe_allow_html=True)
             st.markdown(f"<a href='https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client' target='_blank' style='{link_style}'>🔗 신정고 캠프 학생 결과물 모음</a>", unsafe_allow_html=True)
@@ -453,10 +474,9 @@ def render_camp_overview(current_role, current_hub):
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
-# 💡 사이드바 가독성 상향 CSS 추가
+# 💡 사이드바 가독성 상향 CSS
 st.markdown("""
 <style>
-/* 1. 제출 버튼 (폼 안의 기본 primary 버튼을 진한 빨간색으로 변경) */
 [data-testid="stFormSubmitButton"] button, button[kind="primary"] {
     background-color: #FF4B4B !important;
     color: white !important;
@@ -474,7 +494,6 @@ st.markdown("""
     color: white !important;
 }
 
-/* 2. 메인 화면으로 돌아가기 버튼 (진한 파란색 우회 적용) */
 div.element-container:has(.back-btn-wrapper) + div.element-container button {
     background-color: #0056b3 !important;
     color: white !important;
@@ -492,7 +511,6 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
 }
 .back-btn-wrapper { display: none; }
 
-/* 3. 학생 차시 텍스트 입력창 가독성 최적화 */
 .stMarkdown p {
     font-size: 17px !important;
     color: #222222 !important;
@@ -506,14 +524,12 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
     font-weight: 500 !important;
 }
 
-/* 4. 활동지 이동 버튼 글씨 검정색 & 진하게 */
 button[kind="secondary"] p {
     color: #000000 !important;
     font-weight: 900 !important;
     font-size: 16px !important;
 }
 
-/* 5. 표(Data Editor) 디자인 시인성 대폭 강화 */
 [data-testid="stDataFrame"] {
     border: 2px solid #333 !important;
     border-radius: 5px;
@@ -538,7 +554,7 @@ table td {
     font-weight: 600 !important;
 }
 
-/* 💡 6. 사이드바 텍스트 크기 및 진하기 상향 (새로 추가됨) */
+/* 사이드바 텍스트 크기/진하기 보강 */
 [data-testid="stSidebar"] .stMarkdown p,
 [data-testid="stSidebar"] .stSelectbox label p,
 [data-testid="stSidebar"] .stTextInput label p,
@@ -589,9 +605,9 @@ else:
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
         reg_hub = st.sidebar.selectbox("거점학교 선택", HUB_SCHOOLS)
-        reg_role = st.sidebar.selectbox("회원가입 유형", ["학생", "교사"])
+        reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
         if reg_role == "학생": 
-            reg_school = st.sidebar.text_input("소속 학교(원적교)")
+            reg_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 무룡고등학교")
             reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
         else: 
             reg_school = "교사소속"; reg_class = "교사"
@@ -603,16 +619,22 @@ else:
         if st.sidebar.button("가입 신청", type="primary", use_container_width=True):
             if reg_role and reg_id and reg_pw and reg_name and reg_school:
                 user_key = f"{reg_school}_{reg_id}" if reg_role == "학생" else f"teacher_{reg_id}"
-                if user_key in users: st.sidebar.error("❌ 해당 학번/ID가 이미 존재합니다.")
-                else:
-                    users[user_key] = {"id": reg_id, "password": reg_pw, "name": reg_name, "role": reg_role, "school": reg_school if reg_role == "학생" else "소속없음", "class_group": reg_class, "approved": False, "hub_school": reg_hub}
-                    save_json(USERS_FILE, users); st.sidebar.success("🎉 가입 완료! 관리자의 승인을 기다려주세요.")
+                
+                # 💡 [핵심 해결] 가입 시에도 락을 걸어서 40명이 동시에 가입 버튼을 눌러도 파일이 초기화되지 않도록 보호합니다.
+                with db_lock:
+                    fresh_users = load_json(USERS_FILE, {}) 
+                    if user_key in fresh_users: 
+                        st.sidebar.error("❌ 해당 학번/ID가 이미 존재합니다.")
+                    else:
+                        fresh_users[user_key] = {"id": reg_id, "password": reg_pw, "name": reg_name, "role": reg_role, "school": reg_school if reg_role == "학생" else "소속없음", "class_group": reg_class, "approved": False, "hub_school": reg_hub}
+                        save_json(USERS_FILE, fresh_users)
+                        st.sidebar.success("🎉 가입 완료! 관리자의 승인을 기다려주세요.")
             else: st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
         login_hub = st.sidebar.selectbox("접속할 거점학교", HUB_SCHOOLS)
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사(관리자)"])
-        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교(원적교)")
+        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 무룡고등학교")
         else: login_school = ""
             
         input_id = st.sidebar.text_input("학번/ID")
@@ -702,11 +724,13 @@ else:
                             st.markdown("<br>", unsafe_allow_html=True)
                         
                         if st.form_submit_button("제출 및 저장하기", type="primary"):
-                            if current_user_key not in learning_data: learning_data[current_user_key] = {}
-                            if tab_name not in learning_data[current_user_key]: learning_data[current_user_key][tab_name] = {}
-                            for q_id, text_val in ans_dict.items():
-                                learning_data[current_user_key][tab_name][q_id] = {"text": text_val, "link": "", "file_name": "", "file_path": ""}
-                            save_json(DATA_FILE, learning_data)
+                            with db_lock: # 💡 동시 접속 완벽 보호
+                                fresh_data = load_json(DATA_FILE, {}) 
+                                if current_user_key not in fresh_data: fresh_data[current_user_key] = {}
+                                if tab_name not in fresh_data[current_user_key]: fresh_data[current_user_key][tab_name] = {}
+                                for q_id, text_val in ans_dict.items():
+                                    fresh_data[current_user_key][tab_name][q_id] = {"text": text_val, "link": "", "file_name": "", "file_path": ""}
+                                save_json(DATA_FILE, fresh_data)
                             st.toast(f"💾 {tab_name} 자료가 성공적으로 저장되었습니다!")
 
         elif current_role in ["교사", "관리자"]:
@@ -731,11 +755,21 @@ else:
                         approve_target = st.selectbox("승인할 회원을 선택하세요", ["선택"] + list(pending_users.keys()), format_func=lambda x: x if x == "선택" else f"[{pending_users[x].get('school', '소속없음')}] {pending_users[x].get('name', '이름없음')} ({pending_users[x].get('id', x.split('_')[-1])})")
                         if approve_target != "선택":
                             if st.button("✅ 선택한 회원 가입 승인", type="primary"):
-                                all_users[approve_target]["approved"] = True; save_json(USERS_FILE, all_users); st.success("승인 완료!"); st.rerun()
+                                with db_lock:
+                                    fresh_users = load_json(USERS_FILE, {})
+                                    if approve_target in fresh_users:
+                                        fresh_users[approve_target]["approved"] = True
+                                        save_json(USERS_FILE, fresh_users)
+                                st.success("승인 완료!"); st.rerun()
                     with col_app2:
                         if st.button("✅ 대기 중인 모든 회원 일괄 승인", type="primary"):
-                            for uid in pending_users.keys(): all_users[uid]["approved"] = True
-                            save_json(USERS_FILE, all_users); st.success("일괄 승인 완료!"); st.rerun()
+                            with db_lock:
+                                fresh_users = load_json(USERS_FILE, {})
+                                for uid in pending_users.keys(): 
+                                    if uid in fresh_users:
+                                        fresh_users[uid]["approved"] = True
+                                save_json(USERS_FILE, fresh_users)
+                            st.success("일괄 승인 완료!"); st.rerun()
                 else: st.info("가입 승인을 대기 중인 회원이 없습니다.")
 
                 st.markdown("---")
@@ -757,14 +791,24 @@ else:
                         delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if delete_target != "선택":
                             if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제", type="primary"):
-                                del all_users[delete_target]; save_json(USERS_FILE, all_users); st.success("삭제 완료"); st.rerun()
+                                with db_lock:
+                                    fresh_users = load_json(USERS_FILE, {})
+                                    if delete_target in fresh_users:
+                                        del fresh_users[delete_target]
+                                        save_json(USERS_FILE, fresh_users)
+                                st.success("삭제 완료"); st.rerun()
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
                         pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         new_pw = st.text_input("새로운 비밀번호 입력", type="password")
                         if pw_target != "선택":
                             if st.button("비밀번호 변경 적용", type="primary") and new_pw:
-                                all_users[pw_target]["password"] = new_pw; save_json(USERS_FILE, all_users); st.success("비밀번호 성공적으로 변경"); st.rerun()
+                                with db_lock:
+                                    fresh_users = load_json(USERS_FILE, {})
+                                    if pw_target in fresh_users:
+                                        fresh_users[pw_target]["password"] = new_pw
+                                        save_json(USERS_FILE, fresh_users)
+                                st.success("비밀번호 성공적으로 변경"); st.rerun()
 
             if current_role == "관리자":
                 with menu_tabs[2]:
@@ -786,13 +830,25 @@ else:
                                         with open(file_path, "wb") as f: f.write(mat_file.getvalue())
                                         new_mat["type"] = "file"; new_mat["content"] = file_path; new_mat["filename"] = mat_file.name
                                     else: st.error("파일을 선택해주세요."); st.stop()
-                                app_config["materials"].append(new_mat); save_json(CONFIG_FILE, app_config); st.success("등록 완료!"); st.rerun()
-                    current_materials = app_config.get("materials", [])
+                                
+                                with db_lock:
+                                    fresh_config = load_json(CONFIG_FILE, {})
+                                    if "materials" not in fresh_config: fresh_config["materials"] = []
+                                    fresh_config["materials"].append(new_mat)
+                                    save_json(CONFIG_FILE, fresh_config)
+                                st.success("등록 완료!"); st.rerun()
+                    
+                    current_materials = load_json(CONFIG_FILE, {}).get("materials", [])
                     if current_materials:
                         st.write("🗑️ **등록된 강의 자료 삭제**")
                         del_mat_target = st.selectbox("삭제할 자료를 선택하세요", options=current_materials, format_func=lambda x: x.get("title", "제목없음"))
                         if st.button("선택한 자료 삭제하기", type="primary"):
-                            app_config["materials"].remove(del_mat_target); save_json(CONFIG_FILE, app_config); st.success("삭제 완료!"); st.rerun()
+                            with db_lock:
+                                fresh_config = load_json(CONFIG_FILE, {})
+                                if "materials" in fresh_config and del_mat_target in fresh_config["materials"]:
+                                    fresh_config["materials"].remove(del_mat_target)
+                                    save_json(CONFIG_FILE, fresh_config)
+                            st.success("삭제 완료!"); st.rerun()
                     
                     st.markdown("---")
                     st.subheader("⚙️ 차시(Tab) 동적 제어")
@@ -802,16 +858,27 @@ else:
                         new_tab_name = st.text_input("추가할 차시 이름 입력")
                         new_pdf_name = st.text_input("연결할 PDF 파일명", value="session_new.pdf")
                         if st.button("차시 개설하기", type="primary"):
-                            if new_tab_name and new_tab_name not in app_config["tabs"]:
-                                app_config["tabs"].append(new_tab_name); app_config["pdfs"][new_tab_name] = new_pdf_name; app_config["questions"][new_tab_name] = []
-                                save_json(CONFIG_FILE, app_config); st.success(f"🎉 {new_tab_name} 개설 완료."); st.rerun()
+                            with db_lock:
+                                fresh_config = load_json(CONFIG_FILE, {})
+                                if new_tab_name and new_tab_name not in fresh_config["tabs"]:
+                                    fresh_config["tabs"].append(new_tab_name)
+                                    fresh_config["pdfs"][new_tab_name] = new_pdf_name
+                                    fresh_config["questions"][new_tab_name] = []
+                                    save_json(CONFIG_FILE, fresh_config)
+                            st.success(f"🎉 {new_tab_name} 개설 완료."); st.rerun()
                     with col2:
                         st.write("❌ **기존 학습 차시 폐쇄**")
                         del_tab_target = st.selectbox("삭제할 차시를 지정하세요", ["선택"] + app_config["tabs"])
                         if del_tab_target != "선택":
                             if st.button(f"🔥 {del_tab_target} 세션 및 질문 전체 삭제", type="primary"):
-                                app_config["tabs"].remove(del_tab_target); app_config["pdfs"].pop(del_tab_target, None); app_config["questions"].pop(del_tab_target, None)
-                                save_json(CONFIG_FILE, app_config); st.success(f"삭제 완료."); st.rerun()
+                                with db_lock:
+                                    fresh_config = load_json(CONFIG_FILE, {})
+                                    if del_tab_target in fresh_config["tabs"]:
+                                        fresh_config["tabs"].remove(del_tab_target)
+                                        fresh_config["pdfs"].pop(del_tab_target, None)
+                                        fresh_config["questions"].pop(del_tab_target, None)
+                                        save_json(CONFIG_FILE, fresh_config)
+                                st.success(f"삭제 완료."); st.rerun()
                                 
                     st.markdown("---")
                     st.subheader("📝 차시별 제출 텍스트 상자(질문 문항) 동적 가변 설정")
@@ -823,14 +890,24 @@ else:
                         with q_col1:
                             add_q_label = st.text_input("질문 설명(라벨) 문구 입력")
                             if st.button("질문 추가", type="primary") and add_q_label:
-                                new_id = f"q_{datetime.datetime.now().strftime('%d%H%M%S')}"
-                                current_qs.append({"id": new_id, "label": add_q_label})
-                                app_config["questions"][target_q_tab] = current_qs; save_json(CONFIG_FILE, app_config); st.success("문항 추가 완료."); st.rerun()
+                                with db_lock:
+                                    fresh_config = load_json(CONFIG_FILE, {})
+                                    new_id = f"q_{datetime.datetime.now().strftime('%d%H%M%S')}"
+                                    if target_q_tab in fresh_config["questions"]:
+                                        fresh_config["questions"][target_q_tab].append({"id": new_id, "label": add_q_label})
+                                        save_json(CONFIG_FILE, fresh_config)
+                                st.success("문항 추가 완료."); st.rerun()
                         with q_col2:
                             if current_qs:
                                 del_q_target = st.selectbox("삭제할 문항 고르기", options=current_qs, format_func=lambda x: x.get("label", ""))
                                 if st.button("선택한 문항 삭제", type="primary"):
-                                    current_qs.remove(del_q_target); app_config["questions"][target_q_tab] = current_qs; save_json(CONFIG_FILE, app_config); st.success("삭제 완료."); st.rerun()
+                                    with db_lock:
+                                        fresh_config = load_json(CONFIG_FILE, {})
+                                        if target_q_tab in fresh_config["questions"]:
+                                            current_list = fresh_config["questions"][target_q_tab]
+                                            fresh_config["questions"][target_q_tab] = [q for q in current_list if q["id"] != del_q_target["id"]]
+                                            save_json(CONFIG_FILE, fresh_config)
+                                    st.success("삭제 완료."); st.rerun()
 
             with menu_tabs[-1]:
                 st.subheader("📥 반별 학생 학습 활동 및 제출 자료 조회")
