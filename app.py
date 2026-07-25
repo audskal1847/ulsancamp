@@ -4,7 +4,10 @@ import os
 import base64
 import pandas as pd
 import datetime
-import threading # 💡 [핵심 안전장치] 동시 접속 충돌 방지 모듈
+import threading
+import time
+import zipfile  
+import io       
 
 # --- [1] 파일 경로 설정 및 상수 정의 ---
 USERS_FILE = "users.json"
@@ -14,16 +17,11 @@ UPLOAD_DIR = "uploads"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-CLASS_GROUPS = ["1반", "2반", "3반", "4반"]
+CLASS_GROUPS = ["1반", "2반", "3반", "4반", "5반", "6반"] # 필요에 따라 반 추가 가능
 HUB_SCHOOLS = ["호계고등학교", "함월고등학교", "성광여자고등학교"]
 
-# 관리자 계정 세팅
 ADMIN_ACCOUNTS = {
-    "admin": {"pw": "admin00", "name": "정현경", "school": "울산여자고등학교"},
-    "admin1": {"pw": "admin11", "name": "임종우", "school": "신선여자고등학교"},
-    "admin2": {"pw": "admin22", "name": "김명남", "school": "신선여자고등학교"},
-    "admin3": {"pw": "admin33", "name": "김민성", "school": "매곡고등학교"},
-    "admin4": {"pw": "admin44", "name": "이학승", "school": "함월고등학교"}
+    "audskal": {"pw": "1847", "name": "김명남", "school": "신선여자고등학교"}
 }
 
 ACTIVITIES = [
@@ -38,32 +36,50 @@ ACTIVITIES = [
     "[활동지9] 심화탐구 후속 활동 계획: 독서 연계 & 대입 로드맵"
 ]
 
-# 모든 활동지 안내 문구의 디자인 템플릿
 INFO_BOX = "<div style='background-color: #f0f4f8; padding: 15px; border-radius: 8px; font-size: 17px; font-weight: 600; color: #222; margin-bottom: 15px; border-left: 5px solid #0056b3; line-height: 1.5;'>{}</div>"
 
-# 💡 [핵심 안전장치] 동시 접속 대기열 생성 (데이터 덮어쓰기 완벽 방지)
 db_lock = threading.Lock()
 
-# --- [2] 데이터 입출력 및 초기화 함수 ---
+def show_success_message():
+    st.balloons()
+    st.markdown("""
+    <div style='background-color: #e8f5e9; border: 2px solid #4caf50; padding: 20px; border-radius: 10px; text-align: center; margin-top: 20px; margin-bottom: 20px;'>
+        <h2 style='color: #2e7d32; margin-top: 0; margin-bottom: 10px;'>🎉 화면 저장이 완료되었습니다!</h2>
+        <p style='color: #1b5e20; font-size: 16px; font-weight: bold; margin-bottom: 0;'>입력하신 내용이 데이터베이스에 안전하게 저장되었습니다.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+def encode_token(user_key, hub_school):
+    raw = f"{user_key}|{hub_school}"
+    return base64.b64encode(raw.encode('utf-8')).decode('utf-8')
+
+def decode_token(token):
+    try:
+        decoded = base64.b64decode(token.encode('utf-8')).decode('utf-8')
+        return decoded.split("|")
+    except:
+        return None, None
+
 def load_json(file_path, default_value):
     if not os.path.exists(file_path):
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(default_value, f, ensure_ascii=False, indent=4)
         return default_value
-    try:
-        with open(file_path, "r", encoding="utf-8") as f: 
-            return json.load(f)
-    except json.JSONDecodeError: 
-        return default_value
+    for _ in range(5):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f: 
+                return json.load(f)
+        except json.JSONDecodeError:
+            time.sleep(0.1)
+    return default_value
 
 def save_json(file_path, data):
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 def init_system():
-    with db_lock: # 💡 초기화 시에도 락을 걸어 충돌 방지
+    with db_lock:
         users = load_json(USERS_FILE, {})
-        
         users_changed = False
         for adm_id, adm_info in ADMIN_ACCOUNTS.items():
             if adm_id not in users or users[adm_id].get("password") != adm_info["pw"] or users[adm_id].get("name") != adm_info["name"]:
@@ -73,9 +89,7 @@ def init_system():
                     "approved": True, "hub_school": "전체" 
                 }
                 users_changed = True
-                
-        if users_changed:
-            save_json(USERS_FILE, users)
+        if users_changed: save_json(USERS_FILE, users)
         
         default_tabs = [f"{i}차시" for i in range(1, 9)]
         default_pdfs = {f"{i}차시": f"session{i}.pdf" for i in range(1, 9)}
@@ -88,7 +102,6 @@ def init_system():
         
         current_config = load_json(CONFIG_FILE, {})
         needs_update = False
-        
         if current_config.get("tabs") != default_tabs:
             current_config["tabs"] = default_tabs
             current_config["pdfs"] = default_pdfs
@@ -100,13 +113,10 @@ def init_system():
                     if "questions" not in current_config: current_config["questions"] = {}
                     current_config["questions"][tab] = default_questions_template.copy()
                     needs_update = True
-                    
         if "materials" not in current_config:
             current_config["materials"] = []
             needs_update = True
-            
-        if needs_update:
-            save_json(CONFIG_FILE, current_config)
+        if needs_update: save_json(CONFIG_FILE, current_config)
 
 def display_pdf(file_path):
     if os.path.exists(file_path):
@@ -115,153 +125,274 @@ def display_pdf(file_path):
         st.markdown(f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="450" type="application/pdf"></iframe>', unsafe_allow_html=True)
     else: st.info(f"💡 교재 파일('{file_path}')이 폴더에 없습니다. 파일을 업로드하면 이곳에 표시됩니다.")
 
+# --- [전체 / 활동지별 포트폴리오 HTML 생성 공통 모듈] ---
+def generate_html_report(u_info, student_answers, target_act=None, app_config=None):
+    html_content = f"""<!DOCTYPE html>
+    <html lang="ko">
+    <head>
+    <meta charset="UTF-8">
+    <title>학습 포트폴리오</title>
+    <style>
+        body {{ font-family: 'Malgun Gothic', dotum, sans-serif; padding: 40px; line-height: 1.6; color: #333; }}
+        h1 {{ text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }}
+        h2 {{ color: #2c3e50; border-left: 5px solid #3498db; padding-left: 10px; margin-top: 40px; }}
+        h3 {{ color: #2980b9; margin-top: 20px; }}
+        h4 {{ color: #34495e; margin-top: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; font-size: 14px; }}
+        th, td {{ border: 1px solid #bdc3c7; padding: 10px; text-align: left; }}
+        th {{ background-color: #ecf0f1; font-weight: bold; text-align: center; }}
+        .content-box {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #e9ecef; margin-bottom: 20px; white-space: pre-wrap; }}
+        .link-text {{ color: #e74c3c; font-weight: bold; text-decoration: none; }}
+    </style>
+    </head>
+    <body>
+        <h1>📚 학습 포트폴리오</h1>
+        <div style="text-align: right; margin-bottom: 30px; font-size: 16px;">
+            <strong>학교:</strong> {u_info.get('school', '')}<br>
+            <strong>소속:</strong> {u_info.get('class_group', '')}<br>
+            <strong>이름:</strong> {u_info.get('name', '')} ({u_info.get('id', u_info.get('username', ''))})
+        </div>
+    """
+    
+    acts_to_render = [target_act] if target_act else ACTIVITIES
+    
+    if not target_act:
+        html_content += "<h2>📑 [1] 활동지 작성 내역</h2>"
+        
+    for act in acts_to_render:
+        ans = student_answers.get(act, {})
+        if not ans and target_act is None: continue
+        
+        if act == ACTIVITIES[0] and ans.get("is_custom"):
+            html_content += f"<h3>▶ {act}</h3><h4>[1단계] 추출한 핵심 내용 요소</h4><table><tr><th>학과/전공명</th><th>핵심 내용 요소</th></tr>"
+            for row in ans.get("df1", []): html_content += f"<tr><td>{row.get('학과/전공명', '')}</td><td>{row.get('핵심 내용 요소', '')}</td></tr>"
+            html_content += "</table><h4>[2단계] 생기부 탐구 내용 분석</h4><table><tr><th>구분</th><th>키워드1</th><th>키워드2</th><th>키워드3</th><th>키워드4</th><th>키워드5</th></tr>"
+            for row in ans.get("df2", []): html_content += f"<tr><td><b>{row.get('구분', '')}</b></td><td>{row.get('키워드1','')}</td><td>{row.get('키워드2','')}</td><td>{row.get('키워드3','')}</td><td>{row.get('키워드4','')}</td><td>{row.get('키워드5','')}</td></tr>"
+            html_content += f"</table><h4>[3단계] 탐구 주제 및 문제 인식</h4><div class='content-box'>{ans.get('step3', '')}</div>"
+        elif act == ACTIVITIES[1] and ans.get("is_custom_act2"):
+            html_content += f"<h3>▶ {act}</h3><h4>[1단계] 관심에서 출발하기</h4><p><b>관심 있는 것:</b> {ans.get('step1_1', '')}</p><p><b>계기:</b> {ans.get('step1_2', '')}</p><table><tr><th>구분</th><th>내용</th></tr>"
+            for row in ans.get("df1", []): html_content += f"<tr><td>{row.get('구분', '')}</td><td>{row.get('내용', '')}</td></tr>"
+            html_content += "</table><h4>[2단계] 교과 개념에 닻 내리기</h4><table><tr><th>구분</th><th>내용</th></tr>"
+            for row in ans.get("df2", []): html_content += f"<tr><td>{row.get('구분', '')}</td><td>{row.get('내용', '')}</td></tr>"
+            html_content += f"</table><p><b>잠정적 탐구 방향:</b> {ans.get('step2_dir', '')}</p><h4>[3단계] 주제 적절성 자가 진단</h4><table><tr><th>점검 항목</th><th>점검 질문</th><th>좋은 예</th><th>판단 (O/X)</th></tr>"
+            for row in ans.get("df3", []): html_content += f"<tr><td>{row.get('점검 항목', '')}</td><td>{row.get('점검 질문', '')}</td><td>{row.get('좋은 예', '')}</td><td>{row.get('판단 (O/X)', '')}</td></tr>"
+            html_content += "</table><h4>[4단계] 막연한 주제를 학술적 질문으로 바꾸기</h4>"
+            html_content += f"<p><b>선택한 렌즈:</b> {ans.get('step4_1', '')}</p><p><b>핵심 탐구 질문:</b> {ans.get('step4_2', '')}</p><h4>[5단계] 탐구 전략 하나 정하기</h4>"
+            html_content += f"<p><b>선택한 전략:</b> {ans.get('step5_1', '')}</p><p><b>구체적인 접근 방법:</b> {ans.get('step5_2', '')}</p><h4>[6단계] AI 멘토에게 점검받기</h4>"
+            html_content += f"<div class='content-box'><b>반영할 점:</b><br>{ans.get('step6', '')}</div><h4>[7단계] 나의 탐구 계획 완성하기</h4><table><tr><th>항목</th><th>내용</th></tr>"
+            for row in ans.get("df7", []): html_content += f"<tr><td>{row.get('항목', '')}</td><td>{row.get('내용', '')}</td></tr>"
+            html_content += f"</table><p><b>요약:</b> 나는 <b>({ans.get('step7_s1', '')})</b> 개념을 활용해, <b>({ans.get('step7_s2', '')})</b> 전략으로 <b>({ans.get('step7_s3', '')})</b>을(를) 밝히려 한다.</p>"
+        elif act in [ACTIVITIES[2], ACTIVITIES[5], ACTIVITIES[6]] and ans.get("is_custom_feedback"):
+            html_content += f"<h3>▶ {act}</h3><table><tr><th>구분</th><th>피드백 내용 (구체적으로)</th><th>보완 및 수정 계획</th></tr>"
+            for row in ans.get("df1", []): html_content += f"<tr><td><b>{row.get('구분','')}</b></td><td><pre>{row.get('피드백 내용 (구체적으로)','')}</pre></td><td><pre>{row.get('보완 및 수정 계획','')}</pre></td></tr>"
+            html_content += "</table>"
+        elif act == ACTIVITIES[3] and ans.get("is_custom_refs"):
+            html_content += f"<h3>▶ {act}</h3><table><tr><th>사이트명</th><th>제목</th><th>내용</th><th>선정이유</th></tr>"
+            for row in ans.get("df1", []): html_content += f"<tr><td>{row.get('사이트명','')}</td><td>{row.get('제목','')}</td><td>{row.get('내용','')}</td><td>{row.get('선정이유','')}</td></tr>"
+            html_content += "</table>"
+        elif act == ACTIVITIES[4] and ans.get("is_custom_act5"):
+            html_content += f"<h3>▶ {act}</h3><h4>1. 기본 정보</h4><table>"
+            html_content += f"<tr><th>교과명(강의명)</th><td>{ans.get('info_course', '')}</td><th>탐구 기간</th><td>{ans.get('info_date', '')}</td></tr>"
+            html_content += f"<tr><th>소속학교</th><td>{ans.get('info_school', '')}</td><th>진로 희망</th><td>{ans.get('info_career', '')}</td></tr>"
+            html_content += f"<tr><th>학번/이름</th><td>{ans.get('info_name', '')}</td><th>관련 교과, 단원</th><td>{ans.get('info_subject', '')}</td></tr>"
+            html_content += f"<tr><th>탐구 방법</th><td>{ans.get('info_method', '')}</td><th>탐구 주제</th><td>{ans.get('info_topic', '')}</td></tr></table>"
+            html_content += f"<h4>2. 탐구 개요</h4><p><b>가. 탐구 주제:</b> {ans.get('topic_title', '')}</p><p><b>나. 탐구 동기 및 배경</b></p>"
+            html_content += f"<p>1) 교과 연계 동기: {ans.get('motive_1', '')}</p><p>2) 선정 배경: {ans.get('motive_2', '')}</p><p>3) 탐구 목적: {ans.get('purpose', '')}</p><p>4) 이론적 배경:</p><table><tr><th>구분</th><th>내용</th></tr>"
+            for row in ans.get("bg_df", []): html_content += f"<tr><td>{row.get('구분', '')}</td><td>{row.get('내용', '')}</td></tr>"
+            html_content += f"</table><h4>3. 탐구 설계 및 내용</h4><p><b>가. 탐구 방법:</b> {', '.join(ans.get('selected_methods', []))}</p><p><b>나. 세부 절차:</b></p><table><tr><th>순서</th><th>한 일</th></tr>"
+            for row in ans.get("proc_df", []): html_content += f"<tr><td>{row.get('순서', '')}</td><td>{row.get('한 일', '')}</td></tr>"
+            html_content += f"</table><p><b>다. 탐구 내용 (본론):</b></p><div class='content-box'>{ans.get('content_body', '')}</div><p><b>라. 탐구 결과</b></p>"
+            html_content += f"<p>1) 결과 요약: {ans.get('result_summary', '')}</p><p>2) 해석 및 의의: {ans.get('result_meaning', '')}</p><h4>4. 결론 및 제언</h4>"
+            html_content += f"<p><b>가. 결론:</b> {ans.get('conclusion', '')}</p><p><b>나. 성찰</b></p><p>1) 배우고 느낀 점: {ans.get('reflection_1', '')}</p><p>2) 한계점: {ans.get('reflection_2', '')}</p>"
+            html_content += f"<p><b>다. 후속 활동:</b> {ans.get('next_step', '')}</p><h4>5. 참고 문헌</h4><p><b>가. 논문/도서:</b> {ans.get('ref_book', '')}</p><p><b>나. 웹사이트/기사:</b> {ans.get('ref_web', '')}</p>"
+        elif act == ACTIVITIES[7] and ans.get("is_custom_self_eval"):
+            html_content += f"<h3>▶ {act}</h3><table><tr><th>항목</th><th>내용</th></tr>"
+            for row in ans.get("df1", []): html_content += f"<tr><td><b>{row.get('항목','')}</b></td><td><pre>{row.get('내용','')}</pre></td></tr>"
+            html_content += "</table>"
+        elif act == ACTIVITIES[8] and ans.get("is_custom_roadmap"):
+            html_content += f"<h3>▶ {act}</h3><h4>1. 꼬리에 꼬리를 무는 독서</h4><table><tr><th>구분</th><th>도서명 / 저자</th><th>선정 이유 (탐구 활동과의 연결고리)</th></tr>"
+            for row in ans.get("df1", []): html_content += f"<tr><td><b><pre>{row.get('구분','')}</pre></b></td><td>{row.get('도서명 / 저자','')}</td><td>{row.get('선정 이유 (탐구 활동과의 연결고리)','')}</td></tr>"
+            html_content += "</table><h4>2. 나만의 3개년 실천 로드맵</h4><table><tr><th>시기</th><th>중점 목표</th><th>주요 활동 계획</th></tr>"
+            for row in ans.get("df2", []): html_content += f"<tr><td><b><pre>{row.get('시기','')}</pre></b></td><td><pre>{row.get('중점 목표','')}</pre></td><td><pre>{row.get('주요 활동 계획 (주제탐구, 독서, 실험 등)','')}</pre></td></tr>"
+            html_content += "</table>"
+        else:
+            ans_content = ans.get("content", {})
+            if isinstance(ans_content, str): ans_content = {"text": ans_content}
+            if ans_content.get("text") or ans_content.get("link"):
+                html_content += f"<h3>▶ {act}</h3>"
+                if ans_content.get("text"): html_content += f"<b>[텍스트 작성 내용]</b><div class='content-box'>{ans_content['text']}</div>"
+                if ans_content.get("link"): html_content += f"<b>[제출 링크]</b> <a href='{ans_content['link']}' target='_blank' class='link-text'>{ans_content['link']}</a><br><br>"
+
+    if not target_act and app_config:
+        html_content += "<h2>📝 [2] 차시별 제출 자료</h2>"
+        for t_name in app_config.get("tabs", []):
+            for q in app_config.get("questions", {}).get(t_name, []):
+                ans = student_answers.get(t_name, {}).get(q["id"], {})
+                if isinstance(ans, str): ans = {"text": ans} 
+                if ans.get("text"):
+                    html_content += f"<h3>▶ [{t_name}] {q.get('label', '')}</h3>"
+                    html_content += f"<div class='content-box'>{ans['text']}</div>"
+
+    html_content += "</body></html>"
+    return html_content
+
+def render_download_button(user_key, category):
+    current_data = load_json(DATA_FILE, {})
+    ans = current_data.get(user_key, {}).get(category, {})
+    if ans:
+        st.markdown("<br>", unsafe_allow_html=True)
+        html_data = generate_html_report(st.session_state.user_info, current_data.get(user_key, {}), target_act=category)
+        st.download_button(label=f"📥 제출한 내 내용 다운로드 ({category[:6]} AI 분석용)", 
+                           data=html_data.encode('utf-8-sig'), 
+                           file_name=f"{category}_내용.html", 
+                           mime="text/html",
+                           use_container_width=True)
+
 # --- [3] 활동지별 맞춤형 폼 렌더링 함수들 ---
 def render_activity1_form(user_key):
     category = ACTIVITIES[0]
     ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     st.markdown(INFO_BOX.format("전공 가이드북을 활용하여 진학을 희망하는 학과의 핵심 내용 요소를 추출하고 이를 바탕으로 자신의 학교생활기록부의 탐구 활동을 분석/분류한다."), unsafe_allow_html=True)
-    with st.form(key=f"form_act1_{user_key}"):
-        st.markdown("#### [1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기")
-        default_df1 = pd.DataFrame([{"학과/전공명": "", "핵심 내용 요소": ""} for _ in range(4)])
-        df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
-        edited_df1 = st.data_editor(df1, num_rows="dynamic", use_container_width=True, key="act1_df1")
-        st.markdown("---")
-        st.markdown("#### [2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기")
-        st.info("💡 표의 가장 윗줄인 **'✏️ 나의 탐구 키워드'** 행의 빈칸을 더블클릭하여 본인의 키워드를 직접 입력하세요!")
-        default_df2 = pd.DataFrame({
-            "구분": ["✏️ 나의 탐구 키워드", "창체활동", "교과세특"],
-            "키워드1": ["", "", ""], "키워드2": ["", "", ""], "키워드3": ["", "", ""], "키워드4": ["", "", ""], "키워드5": ["", "", ""]
-        })
-        df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
-        edited_df2 = st.data_editor(df2, use_container_width=True, key="act1_df2")
-        st.markdown("<br>#### [2단계-예시]", unsafe_allow_html=True)
-        example_image = os.path.join(os.path.dirname(__file__), "example.png")
-        if os.path.exists(example_image): st.image(example_image, caption="희망 전공 분야 카운팅 표 사례", use_container_width=True)
-        else: st.info("💡 [2단계-예시] 희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.")
-        st.markdown("---")
-        st.markdown("#### [3단계] 이번 특강을 통해 탐구하고 싶은 내용 영역 또는 문제 인식(주제 찾기)")
-        st.markdown(INFO_BOX.format("내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?"), unsafe_allow_html=True)
-        step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
+    
+    st.markdown("#### [1단계] 학과/전공 가이드북 읽고 핵심 내용 요소 추출하기")
+    default_df1 = pd.DataFrame([{"학과/전공명": "", "핵심 내용 요소": ""} for _ in range(4)])
+    df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
+    edited_df1 = st.data_editor(df1, num_rows="dynamic", use_container_width=True, key="act1_df1")
+    st.markdown("---")
+    st.markdown("#### [2단계] 내용 요소 중심 학교생활기록부 탐구 내용 분석하기")
+    st.info("💡 표의 가장 윗줄인 **'✏️ 나의 탐구 키워드'** 행의 빈칸을 더블클릭하여 본인의 키워드를 직접 입력하세요!")
+    default_df2 = pd.DataFrame({
+        "구분": ["✏️ 나의 탐구 키워드", "창체활동", "교과세특"],
+        "키워드1": ["", "", ""], "키워드2": ["", "", ""], "키워드3": ["", "", ""], "키워드4": ["", "", ""], "키워드5": ["", "", ""]
+    })
+    df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
+    edited_df2 = st.data_editor(df2, use_container_width=True, key="act1_df2")
+    st.markdown("<br>#### [2단계-예시]", unsafe_allow_html=True)
+    example_image = os.path.join(os.path.dirname(__file__), "example.png")
+    if os.path.exists(example_image): st.image(example_image, caption="희망 전공 분야 카운팅 표 사례", use_container_width=True)
+    else: st.info("💡 [2단계-예시] 희망 전공 분야 카운팅 표 사례 (고려대 전기전자공학부 등)를 참고하여 위 표의 칸을 채워보세요.")
+    st.markdown("---")
+    st.markdown("#### [3단계] 이번 특강을 통해 탐구하고 싶은 내용 영역 또는 문제 인식(주제 찾기)")
+    st.markdown(INFO_BOX.format("내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?"), unsafe_allow_html=True)
+    step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
-        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            with db_lock: # 💡 동시 접속 완벽 보호
-                current_data = load_json(DATA_FILE, {}) 
-                if user_key not in current_data: current_data[user_key] = {}
-                current_data[user_key][category] = {"is_custom": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'), "step3": step3_val}
-                save_json(DATA_FILE, current_data)
-            st.toast("🎉 활동지1이 성공적으로 저장되었습니다!")
+    if st.button("활동지 최종 제출 및 저장", key="submit_act1", type="primary"):
+        with db_lock:
+            current_data = load_json(DATA_FILE, {}) 
+            if user_key not in current_data: current_data[user_key] = {}
+            current_data[user_key][category] = {"is_custom": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'), "step3": step3_val}
+            save_json(DATA_FILE, current_data)
+        show_success_message()
+    render_download_button(user_key, category)
 
 def render_activity2_form(user_key):
     category = ACTIVITIES[1]
     ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     st.markdown("### 교과서 속 지식을 세상의 해답으로 바꾸는 나만의 탐구 여정")
     st.markdown(INFO_BOX.format("이 활동지는 여러 주제를 나열하는 것이 아니라, <b>하나의 탐구 주제를 스스로 만들어 완성</b>하기 위한 것입니다. 1단계부터 순서대로 채워 나가면 마지막에 나만의 탐구 계획서가 완성됩니다. 각 단계는 앞 단계의 답을 이어받아 점점 구체화되도록 설계되어 있으니, 건너뛰지 말고 차례대로 작성해 보세요."), unsafe_allow_html=True)
-    with st.form(key=f"form_act2_{user_key}"):
-        st.markdown("#### [1단계] 관심에서 출발하기")
-        st.markdown(INFO_BOX.format("최근 궁금했던 것, 불편함을 느꼈던 것, 또는 수업이나 독서 중 더 알고 싶었던 것을 자유롭게 적어 봅니다."), unsafe_allow_html=True)
-        step1_1 = st.text_input("(1) 내가 관심 있는 것 / 궁금했던 현상:", value=ans.get("step1_1", ""))
-        opts1_2 = ["수업이나 책을 보다가 생긴 의문을 파고들고 싶어서 (지적호기심)", "배운 원리를 실생활 문제(사회 문제) 해결에 직접 적용해 보고 싶어서 (문제해결)", "이전에 했던 탐구에서 남은 궁금증이나 한계를 더 발전시키고 싶어서 (연계 및 심화)"]
-        step1_2 = st.radio("(2) 이 관심이 생긴 계기 (하나만 선택)", opts1_2, index=opts1_2.index(ans.get("step1_2", opts1_2[0])))
-        st.markdown("**이전에 했던 탐구의 확장을 선택했다면 아래도 함께 채우세요.**")
-        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
-        default_df1 = pd.DataFrame([{"구분": "이전에 했던 탐구 주제", "내용": ""}, {"구분": "그때 알아낸 것 (결론)", "내용": ""}, {"구분": "풀지 못했거나 아쉬웠던 점", "내용": ""}, {"구분": "이번에 발전시키고 싶은 방향", "내용": "(예: 대상 확대, 조건 변경, 다른 관점 적용, 해결책 제시 등)"}])
-        df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
-        edited_df1 = st.data_editor(df1, hide_index=True, use_container_width=True, disabled=["구분"], key="act2_df1")
-        st.markdown("---")
-        
-        st.markdown("#### [2단계] 교과 개념에 닻 내리기: 내 관심사를 수업에서 배운 원리와 연결하기")
-        st.markdown(INFO_BOX.format("좋은 탐구는 단순한 검색이 아니라 배운 개념 위에서 출발합니다. 과목 이름만 적지 말고, 배운 핵심 개념 하나를 구체적으로 적는 것이 중요합니다."), unsafe_allow_html=True)
-        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
-        default_df2 = pd.DataFrame([{"구분": "관련 교과목, 단원", "내용": "(예: 확률과 통계 - 통계적 추정)"}, {"구분": "수업에서 배운 핵심 개념", "내용": "(예: 표본 조사에서의 신뢰구간과 오차)"}, {"구분": "이 개념이 내 관심사와 연결되는 지점", "내용": ""}])
-        df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
-        edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["구분"], key="act2_df2")
-        step2_dir = st.text_input("**이 시점의 잠정적인 탐구 방향 (한 문장으로):**", value=ans.get("step2_dir", ""))
-        st.markdown("---")
-        
-        st.markdown("#### [3단계] 주제 적절성 자가 진단: 주제가 고등학생 수준에 맞는지 점검")
-        st.caption("※ '판단(O/X)' 열에만 답변을 기입하세요.")
-        default_df3 = pd.DataFrame([
-            {"점검 항목": "1. 교과 개념 연계", "점검 질문": "교과서의 원리 없이 인터넷 검색만으로 알 수 있는 상식적인 내용인가?", "좋은 예": "(나쁜 예) 비타민을 많이 먹으면 좋은지 조사 → (좋은 예) 생명과학 I '방어 작용'을 바탕으로 면역 결핍과 자가면역이 일어나는 기작의 차이 비교", "판단 (O/X)": ""},
-            {"점검 항목": "2. 시의성 (트렌드)", "점검 질문": "너무 유행을 타거나(정치적 이슈 등), 이미 결론이 난 철 지난 주제는 아닌가?", "좋은 예": "(나쁜 예) 특정 정치인을 화자로 시 쓰기 → (좋은 예) 현대 시 한 편을 문학 사조별 대표 시인의 화법으로 다시 쓰기...", "판단 (O/X)": ""},
-            {"점검 항목": "3. 수행 가능성", "점검 질문": "고등학생의 시간·장비·비용으로 실제 조사나 실험이 가능한가?", "좋은 예": "(나쁜 예) 층간소음을 완벽히 없애는 신소재 발명 → (좋은 예) 물-시멘트 배합 비율 및 첨가제 유무에 따른 콘크리트 압축 강도 변화 측정", "판단 (O/X)": ""},
-            {"점검 항목": "4. 동기의 진정성", "점검 질문": "억지로 끼워 맞춘 것이 아니라 1단계의 계기에서 자연스럽게 이어지는가?", "좋은 예": "1단계에 적은 관심·계기와 흐름이 연결되는지 확인", "판단 (O/X)": ""}
-        ])
-        df3 = pd.DataFrame(ans.get("df3", default_df3.to_dict('records')))
-        edited_df3 = st.data_editor(df3, hide_index=True, use_container_width=True, disabled=["점검 항목", "점검 질문", "좋은 예"], key="act2_df3")
-        st.info("자가 진단 결과: 모든 항목이 O라면 다음 단계로 넘어가세요. 하나라도 X라면 주제를 수정해야 합니다.")
-        st.markdown("---")
-        
-        st.markdown("#### [4단계] 막연한 주제를 학술적 질문으로 바꾸기")
-        st.markdown(INFO_BOX.format("좋은 탐구는 좋은 질문에서 시작합니다. 아래 여섯 개의 질문 렌즈 중 딱 하나를 골라, 내 주제를 탐구 가능한 질문으로 바꿔 봅니다."), unsafe_allow_html=True)
-        opts4_1 = ["1. 원인과 결과", "2. 비교와 대조", "3. 평가와 가치", "4. 분류와 특징", "5. 변화 과정", "6. 기타"]
-        step4_1 = st.selectbox("1) 선택한 렌즈:", opts4_1, index=opts4_1.index(ans.get("step4_1", opts4_1[0])))
-        step4_2 = st.text_input("2) 완성한 나의 핵심 탐구 질문:", value=ans.get("step4_2", ""))
-        st.markdown("---")
-        
-        st.markdown("#### [5단계] 탐구 전략 하나 정하기")
-        opts5_1 = ["현미경 (원리 분석)", "벤치마킹 (비교 탐구)", "색안경 (관점 적용)", "의사 (문제 해결)"]
-        step5_1 = st.selectbox("2) 내가 선택한 전략은?", opts5_1, index=opts5_1.index(ans.get("step5_1", opts5_1[0])))
-        step5_2 = st.text_area("3) 이 전략으로 질문에 접근하는 구체적인 방법 (2~3문장)", value=ans.get("step5_2", ""))
-        st.markdown("---")
-        
-        st.markdown("#### [6단계] AI 멘토에게 점검받기")
-        st.markdown(INFO_BOX.format("내가 세운 전략이 논리적이고 고등학생 수준에서 수행 가능한지 AI에게 물어보고 부족한 점을 보완하세요."), unsafe_allow_html=True)
-        st.markdown("**1) 아래 프롬프트의 대괄호 안을 나의 내용으로 채워서 AI에게 질문해 보세요.**")
-        
-        prompt_box = "<div style='background-color: #fff9e6; padding: 20px; border-radius: 8px; border: 1px solid #e0d0a0; color: #222; font-size: 17px; font-style: normal; font-weight: 600; line-height: 1.6; margin-bottom: 15px;'>👉 <b>[AI 프롬프트 예시]</b><br><br>나는 <b>[관련 교과목]</b>의 <b>[핵심 개념]</b>을 바탕으로 <b>[나의 탐구 질문]</b>을 탐구하려고 해. 접근 전략으로는 <b>[선택한 전략]</b>을 사용할 계획이야.<br><br>이 질문이 명확하고 탐구할 가치가 있는지 평가해 줘.<br>고등학생이 실제로 조사·실험할 수 있는 범위인지, 줄이거나 보완할 점이 있으면 알려 줘.<br>참고할 만한 개념이나 자료의 방향을 추천해 줘.</div>"
-        st.markdown(prompt_box, unsafe_allow_html=True)
-        
-        step6 = st.text_area("2) AI의 조언 중 내가 반영할 점:", value=ans.get("step6", ""))
-        st.markdown("---")
-        
-        st.markdown("#### [7단계] 나의 탐구 계획 완성하기")
-        st.caption("※ 첫 번째 열(항목)은 양식 제목이므로 수정하지 마세요.")
-        default_df7 = pd.DataFrame([
-            {"항목": "탐구 주제 (제목)", "내용": ""}, {"항목": "핵심 탐구 질문", "내용": ""}, {"항목": "연계 교과 개념", "내용": ""},
-            {"항목": "탐구 전략", "내용": ""}, {"항목": "탐구 방법 (자료, 조사, 실험 등)", "내용": ""}, {"항목": "기대하는 결론, 알아낼 점", "내용": ""}
-        ])
-        df7 = pd.DataFrame(ans.get("df7", default_df7.to_dict('records')))
-        edited_df7 = st.data_editor(df7, hide_index=True, use_container_width=True, disabled=["항목"], key="act2_df7")
-        
-        st.markdown("<br>**한 문장으로 요약한 나의 탐구**", unsafe_allow_html=True)
-        col1, col2, col3, col4, col5, col6, col7 = st.columns([0.5, 2, 1.2, 2, 0.8, 2, 1.5])
-        with col1: st.write("나는 (")
-        with col2: step7_s1 = st.text_input("개념", value=ans.get("step7_s1", ""), label_visibility="collapsed")
-        with col3: st.write(") 개념을 활용해, (")
-        with col4: step7_s2 = st.text_input("전략", value=ans.get("step7_s2", ""), label_visibility="collapsed")
-        with col5: st.write(") 전략으로 (")
-        with col6: step7_s3 = st.text_input("밝힐점", value=ans.get("step7_s3", ""), label_visibility="collapsed")
-        with col7: st.write(")을(를) 밝히려 한다.")
+    
+    st.markdown("#### [1단계] 관심에서 출발하기")
+    st.markdown(INFO_BOX.format("최근 궁금했던 것, 불편함을 느꼈던 것, 또는 수업이나 독서 중 더 알고 싶었던 것을 자유롭게 적어 봅니다."), unsafe_allow_html=True)
+    step1_1 = st.text_input("(1) 내가 관심 있는 것 / 궁금했던 현상:", value=ans.get("step1_1", ""))
+    opts1_2 = ["수업이나 책을 보다가 생긴 의문을 파고들고 싶어서 (지적호기심)", "배운 원리를 실생활 문제(사회 문제) 해결에 직접 적용해 보고 싶어서 (문제해결)", "이전에 했던 탐구에서 남은 궁금증이나 한계를 더 발전시키고 싶어서 (연계 및 심화)"]
+    step1_2 = st.radio("(2) 이 관심이 생긴 계기 (하나만 선택)", opts1_2, index=opts1_2.index(ans.get("step1_2", opts1_2[0])) if ans.get("step1_2") in opts1_2 else 0)
+    st.markdown("**이전에 했던 탐구의 확장을 선택했다면 아래도 함께 채우세요.**")
+    st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
+    default_df1 = pd.DataFrame([{"구분": "이전에 했던 탐구 주제", "내용": ""}, {"구분": "그때 알아낸 것 (결론)", "내용": ""}, {"구분": "풀지 못했거나 아쉬웠던 점", "내용": ""}, {"구분": "이번에 발전시키고 싶은 방향", "내용": "(예: 대상 확대, 조건 변경, 다른 관점 적용, 해결책 제시 등)"}])
+    df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
+    edited_df1 = st.data_editor(df1, hide_index=True, use_container_width=True, disabled=["구분"], key="act2_df1")
+    st.markdown("---")
+    
+    st.markdown("#### [2단계] 교과 개념에 닻 내리기: 내 관심사를 수업에서 배운 원리와 연결하기")
+    st.markdown(INFO_BOX.format("좋은 탐구는 단순한 검색이 아니라 배운 개념 위에서 출발합니다. 과목 이름만 적지 말고, 배운 핵심 개념 하나를 구체적으로 적는 것이 중요합니다."), unsafe_allow_html=True)
+    st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
+    default_df2 = pd.DataFrame([{"구분": "관련 교과목, 단원", "내용": "(예: 확률과 통계 - 통계적 추정)"}, {"구분": "수업에서 배운 핵심 개념", "내용": "(예: 표본 조사에서의 신뢰구간과 오차)"}, {"구분": "이 개념이 내 관심사와 연결되는 지점", "내용": ""}])
+    df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
+    edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["구분"], key="act2_df2")
+    step2_dir = st.text_input("**이 시점의 잠정적인 탐구 방향 (한 문장으로):**", value=ans.get("step2_dir", ""))
+    st.markdown("---")
+    
+    st.markdown("#### [3단계] 주제 적절성 자가 진단: 주제가 고등학생 수준에 맞는지 점검")
+    st.caption("※ '판단(O/X)' 열에만 답변을 기입하세요.")
+    default_df3 = pd.DataFrame([
+        {"점검 항목": "1. 교과 개념 연계", "점검 질문": "교과서의 원리 없이 인터넷 검색만으로 알 수 있는 상식적인 내용인가?", "좋은 예": "(나쁜 예) 비타민을 많이 먹으면 좋은지 조사 → (좋은 예) 생명과학 I '방어 작용'을 바탕으로 면역 결핍과 자가면역이 일어나는 기작의 차이 비교", "판단 (O/X)": ""},
+        {"점검 항목": "2. 시의성 (트렌드)", "점검 질문": "너무 유행을 타거나(정치적 이슈 등), 이미 결론이 난 철 지난 주제는 아닌가?", "좋은 예": "(나쁜 예) 특정 정치인을 화자로 시 쓰기 → (좋은 예) 현대 시 한 편을 문학 사조별 대표 시인의 화법으로 다시 쓰기...", "판단 (O/X)": ""},
+        {"점검 항목": "3. 수행 가능성", "점검 질문": "고등학생의 시간·장비·비용으로 실제 조사나 실험이 가능한가?", "좋은 예": "(나쁜 예) 층간소음을 완벽히 없애는 신소재 발명 → (좋은 예) 물-시멘트 배합 비율 및 첨가제 유무에 따른 콘크리트 압축 강도 변화 측정", "판단 (O/X)": ""},
+        {"점검 항목": "4. 동기의 진정성", "점검 질문": "억지로 끼워 맞춘 것이 아니라 1단계의 계기에서 자연스럽게 이어지는가?", "좋은 예": "1단계에 적은 관심·계기와 흐름이 연결되는지 확인", "판단 (O/X)": ""}
+    ])
+    df3 = pd.DataFrame(ans.get("df3", default_df3.to_dict('records')))
+    edited_df3 = st.data_editor(df3, hide_index=True, use_container_width=True, disabled=["점검 항목", "점검 질문", "좋은 예"], key="act2_df3")
+    st.info("자가 진단 결과: 모든 항목이 O라면 다음 단계로 넘어가세요. 하나라도 X라면 주제를 수정해야 합니다.")
+    st.markdown("---")
+    
+    st.markdown("#### [4단계] 막연한 주제를 학술적 질문으로 바꾸기")
+    st.markdown(INFO_BOX.format("좋은 탐구는 좋은 질문에서 시작합니다. 아래 여섯 개의 질문 렌즈 중 딱 하나를 골라, 내 주제를 탐구 가능한 질문으로 바꿔 봅니다."), unsafe_allow_html=True)
+    opts4_1 = ["1. 원인과 결과", "2. 비교와 대조", "3. 평가와 가치", "4. 분류와 특징", "5. 변화 과정", "6. 기타"]
+    step4_1 = st.selectbox("1) 선택한 렌즈:", opts4_1, index=opts4_1.index(ans.get("step4_1", opts4_1[0])) if ans.get("step4_1") in opts4_1 else 0)
+    step4_2 = st.text_input("2) 완성한 나의 핵심 탐구 질문:", value=ans.get("step4_2", ""))
+    st.markdown("---")
+    
+    st.markdown("#### [5단계] 탐구 전략 하나 정하기")
+    opts5_1 = ["현미경 (원리 분석)", "벤치마킹 (비교 탐구)", "색안경 (관점 적용)", "의사 (문제 해결)"]
+    step5_1 = st.selectbox("2) 내가 선택한 전략은?", opts5_1, index=opts5_1.index(ans.get("step5_1", opts5_1[0])) if ans.get("step5_1") in opts5_1 else 0)
+    step5_2 = st.text_area("3) 이 전략으로 질문에 접근하는 구체적인 방법 (2~3문장)", value=ans.get("step5_2", ""))
+    st.markdown("---")
+    
+    st.markdown("#### [6단계] AI 멘토에게 점검받기")
+    st.markdown(INFO_BOX.format("내가 세운 전략이 논리적이고 고등학생 수준에서 수행 가능한지 AI에게 물어보고 부족한 점을 보완하세요."), unsafe_allow_html=True)
+    
+    step6 = st.text_area("2) AI의 조언 중 내가 반영할 점:", value=ans.get("step6", ""))
+    st.markdown("---")
+    
+    st.markdown("#### [7단계] 나의 탐구 계획 완성하기")
+    st.caption("※ 첫 번째 열(항목)은 양식 제목이므로 수정하지 마세요.")
+    default_df7 = pd.DataFrame([
+        {"항목": "탐구 주제 (제목)", "내용": ""}, {"항목": "핵심 탐구 질문", "내용": ""}, {"항목": "연계 교과 개념", "내용": ""},
+        {"항목": "탐구 전략", "내용": ""}, {"항목": "탐구 방법 (자료, 조사, 실험 등)", "내용": ""}, {"항목": "기대하는 결론, 알아낼 점", "내용": ""}
+    ])
+    df7 = pd.DataFrame(ans.get("df7", default_df7.to_dict('records')))
+    edited_df7 = st.data_editor(df7, hide_index=True, use_container_width=True, disabled=["항목"], key="act2_df7")
+    
+    st.markdown("<br>**한 문장으로 요약한 나의 탐구**", unsafe_allow_html=True)
+    col1, col2, col3, col4, col5, col6, col7 = st.columns([0.5, 2, 1.2, 2, 0.8, 2, 1.5])
+    with col1: st.write("나는 (")
+    with col2: step7_s1 = st.text_input("개념", value=ans.get("step7_s1", ""), label_visibility="collapsed")
+    with col3: st.write(") 개념을 활용해, (")
+    with col4: step7_s2 = st.text_input("전략", value=ans.get("step7_s2", ""), label_visibility="collapsed")
+    with col5: st.write(") 전략으로 (")
+    with col6: step7_s3 = st.text_input("밝힐점", value=ans.get("step7_s3", ""), label_visibility="collapsed")
+    with col7: st.write(")을(를) 밝히려 한다.")
 
-        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            with db_lock: # 💡 동시 접속 완벽 보호
-                current_data = load_json(DATA_FILE, {}) 
-                if user_key not in current_data: current_data[user_key] = {}
-                current_data[user_key][category] = {
-                    "is_custom_act2": True, "step1_1": step1_1, "step1_2": step1_2,
-                    "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'),
-                    "step2_dir": step2_dir, "df3": edited_df3.to_dict('records'),
-                    "step4_1": step4_1, "step4_2": step4_2, "step5_1": step5_1, "step5_2": step5_2,
-                    "step6": step6, "df7": edited_df7.to_dict('records'),
-                    "step7_s1": step7_s1, "step7_s2": step7_s2, "step7_s3": step7_s3
-                }
-                save_json(DATA_FILE, current_data)
-            st.toast("🎉 활동지2가 성공적으로 저장되었습니다!")
+    if st.button("활동지 최종 제출 및 저장", key="submit_act2", type="primary"):
+        with db_lock: 
+            current_data = load_json(DATA_FILE, {}) 
+            if user_key not in current_data: current_data[user_key] = {}
+            current_data[user_key][category] = {
+                "is_custom_act2": True, "step1_1": step1_1, "step1_2": step1_2,
+                "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records'),
+                "step2_dir": step2_dir, "df3": edited_df3.to_dict('records'),
+                "step4_1": step4_1, "step4_2": step4_2, "step5_1": step5_1, "step5_2": step5_2,
+                "step6": step6, "df7": edited_df7.to_dict('records'),
+                "step7_s1": step7_s1, "step7_s2": step7_s2, "step7_s3": step7_s3
+            }
+            save_json(DATA_FILE, current_data)
+        show_success_message()
+    render_download_button(user_key, category)
 
 def render_feedback_form(user_key, category, rows):
     ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
-    with st.form(key=f"form_{category}_{user_key}"):
-        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
-        default_df = pd.DataFrame([{"구분": r, "피드백 내용 (구체적으로)": "", "보완 및 수정 계획": ""} for r in rows])
-        df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
-        edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["구분"], key=f"df_{category}")
-        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            with db_lock:
-                current_data = load_json(DATA_FILE, {})
-                if user_key not in current_data: current_data[user_key] = {}
-                current_data[user_key][category] = {"is_custom_feedback": True, "df1": edited_df.to_dict('records')}
-                save_json(DATA_FILE, current_data)
-            st.toast(f"🎉 {category} 저장 완료!")
+    st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
+    default_df = pd.DataFrame([{"구분": r, "피드백 내용 (구체적으로)": "", "보완 및 수정 계획": ""} for r in rows])
+    df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
+    edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["구분"], key=f"df_{category}")
+    if st.button("활동지 최종 제출 및 저장", key=f"btn_{category}", type="primary"):
+        with db_lock:
+            current_data = load_json(DATA_FILE, {})
+            if user_key not in current_data: current_data[user_key] = {}
+            current_data[user_key][category] = {"is_custom_feedback": True, "df1": edited_df.to_dict('records')}
+            save_json(DATA_FILE, current_data)
+        show_success_message()
+    render_download_button(user_key, category)
 
 def render_activity3_form(user_key): render_feedback_form(user_key, ACTIVITIES[2], ["참고 아이디어", "방향 제안", "함께 찾아보면 좋을 교과 키워드"])
 def render_activity6_form(user_key): render_feedback_form(user_key, ACTIVITIES[5], ["주제 선정과 교과 연결", "질문 만들기와 탐구 방법", "자료 찾기 및 내용 소화", "나만의 생각 더하기", "마무리 및 다음 단계"])
@@ -271,151 +402,153 @@ def render_activity4_form(user_key):
     category = ACTIVITIES[3]
     ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
     st.markdown("<i>탐구 과정 중 참고하게 되는 자료 목록을 여기에 지속적으로 추가하고, 노트북LM의 소스로 활용합니다.</i>", unsafe_allow_html=True)
-    with st.form(key=f"form_{category}_{user_key}"):
-        default_df = pd.DataFrame([{"사이트명": "", "제목": "", "내용": "", "선정이유": ""} for _ in range(5)])
-        df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
-        edited_df = st.data_editor(df, num_rows="dynamic", hide_index=True, use_container_width=True, key=f"df_{category}")
-        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            with db_lock:
-                current_data = load_json(DATA_FILE, {})
-                if user_key not in current_data: current_data[user_key] = {}
-                current_data[user_key][category] = {"is_custom_refs": True, "df1": edited_df.to_dict('records')}
-                save_json(DATA_FILE, current_data)
-            st.toast("🎉 저장 완료!")
+    default_df = pd.DataFrame([{"사이트명": "", "제목": "", "내용": "", "선정이유": ""} for _ in range(5)])
+    df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
+    edited_df = st.data_editor(df, num_rows="dynamic", hide_index=True, use_container_width=True, key=f"df_{category}")
+    if st.button("활동지 최종 제출 및 저장", key=f"btn_{category}", type="primary"):
+        with db_lock:
+            current_data = load_json(DATA_FILE, {})
+            if user_key not in current_data: current_data[user_key] = {}
+            current_data[user_key][category] = {"is_custom_refs": True, "df1": edited_df.to_dict('records')}
+            save_json(DATA_FILE, current_data)
+        show_success_message()
+    render_download_button(user_key, category)
 
 def render_activity5_form(user_key):
     category = ACTIVITIES[4]
     ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
-    with st.form(key=f"form_act5_{user_key}"):
-        st.markdown("#### 1. 기본 정보")
-        c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
-        c1.markdown("**교과명(강의명)**"); info_course = c2.text_input("교과명", value=ans.get("info_course", "탐구력 신장을 위한 주제 탐구 캠프"), label_visibility="collapsed")
-        c3.markdown("**탐구 기간**"); info_date = c4.text_input("탐구 기간", value=ans.get("info_date", "2026. 7. 23. ~ 7. 24."), label_visibility="collapsed")
-        c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
-        c1.markdown("**소속학교**"); info_school = c2.text_input("소속학교", value=ans.get("info_school", st.session_state.user_info.get("school", "")), label_visibility="collapsed")
-        c3.markdown("**진로 희망**"); info_career = c4.text_input("진로 희망", value=ans.get("info_career", ""), label_visibility="collapsed")
-        c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
-        c1.markdown("**학번/이름**"); default_id_name = f"{st.session_state.user_info.get('username', '')} {st.session_state.user_info.get('name', '')}"
-        info_name = c2.text_input("학번/이름", value=ans.get("info_name", default_id_name), label_visibility="collapsed")
-        c3.markdown("**관련 교과, 단원**"); info_subject = c4.text_input("관련 교과", value=ans.get("info_subject", ""), placeholder="(활동지2 2단계 참고)", label_visibility="collapsed")
-        c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
-        c1.markdown("**탐구 방법**"); info_method = c2.radio("탐구 방법", ["교과 심화", "진로 심화"], index=0 if ans.get("info_method", "교과 심화") == "교과 심화" else 1, horizontal=True, label_visibility="collapsed")
-        c3.markdown("**탐구 주제**"); info_topic = c4.text_input("탐구 주제", value=ans.get("info_topic", ""), placeholder="(활동지2 7단계 참고)", label_visibility="collapsed")
+    
+    st.markdown("#### 1. 기본 정보")
+    c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
+    c1.markdown("**교과명(강의명)**"); info_course = c2.text_input("교과명", value=ans.get("info_course", "탐구력 신장을 위한 주제 탐구 캠프"), label_visibility="collapsed")
+    c3.markdown("**탐구 기간**"); info_date = c4.text_input("탐구 기간", value=ans.get("info_date", "2026. 7. 23. ~ 7. 24."), label_visibility="collapsed")
+    c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
+    c1.markdown("**소속학교**"); info_school = c2.text_input("소속학교", value=ans.get("info_school", st.session_state.user_info.get("school", "")), label_visibility="collapsed")
+    c3.markdown("**진로 희망**"); info_career = c4.text_input("진로 희망", value=ans.get("info_career", ""), label_visibility="collapsed")
+    c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
+    c1.markdown("**학번/이름**"); default_id_name = f"{st.session_state.user_info.get('username', '')} {st.session_state.user_info.get('name', '')}"
+    info_name = c2.text_input("학번/이름", value=ans.get("info_name", default_id_name), label_visibility="collapsed")
+    c3.markdown("**관련 교과, 단원**"); info_subject = c4.text_input("관련 교과", value=ans.get("info_subject", ""), placeholder="(활동지2 2단계 참고)", label_visibility="collapsed")
+    c1, c2, c3, c4 = st.columns([1, 2, 1, 2])
+    c1.markdown("**탐구 방법**"); info_method = c2.radio("탐구 방법", ["교과 심화", "진로 심화"], index=0 if ans.get("info_method", "교과 심화") == "교과 심화" else 1, horizontal=True, label_visibility="collapsed")
+    c3.markdown("**탐구 주제**"); info_topic = c4.text_input("탐구 주제", value=ans.get("info_topic", ""), placeholder="(활동지2 7단계 참고)", label_visibility="collapsed")
 
-        st.markdown("---")
-        st.markdown("#### 2. 탐구 개요\n**가. 탐구 주제**")
-        topic_title = st.text_area("탐구 주제", value=ans.get("topic_title", ""), placeholder="구체적이고 명확한 주제명을 입력하세요. (예: 학교 급식 잔반량 설문 조사를 통해 원인을 분석하고 줄일 방법을 찾는다.)", label_visibility="collapsed")
-        st.markdown("**나. 탐구 동기 및 배경\n1) 교과 연계 동기**")
-        motive_1 = st.text_area("교과 연계 동기", value=ans.get("motive_1", ""), placeholder="어떤 과목, 어떤 단원 수업 중 의문이 생겼나요? 구체적으로 서술하세요.", label_visibility="collapsed")
-        st.markdown("**2) 선정 배경**")
-        motive_2 = st.text_area("선정 배경", value=ans.get("motive_2", ""), placeholder="왜 이 주제를 골랐나요? 평소 흥미나 사회 문제와 연결해 보세요.", label_visibility="collapsed")
-        st.markdown("**3) 탐구 목적**")
-        purpose = st.text_area("탐구 목적", value=ans.get("purpose", ""), placeholder="이 탐구로 최종적으로 무엇을 알아내거나 해결하려 하나요?", label_visibility="collapsed")
-        st.markdown("**4) 이론적 배경**")
-        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
-        default_bg_df = pd.DataFrame([{"구분": "핵심 용어의 뜻", "내용": "(활동지2의 2단계 교과 개념을 사전과 교과서 정의로 정리)"}, {"구분": "참고한 자료 요약", "내용": "(관련 책, 기사, 논문에서 알게 된 내용을 2~3줄로 정리)"}])
-        bg_df = pd.DataFrame(ans.get("bg_df", default_bg_df.to_dict('records')))
-        edited_bg_df = st.data_editor(bg_df, hide_index=True, use_container_width=True, disabled=["구분"], key="act5_bg_df")
+    st.markdown("---")
+    st.markdown("#### 2. 탐구 개요\n**가. 탐구 주제**")
+    topic_title = st.text_area("탐구 주제", value=ans.get("topic_title", ""), placeholder="구체적이고 명확한 주제명을 입력하세요. (예: 학교 급식 잔반량 설문 조사를 통해 원인을 분석하고 줄일 방법을 찾는다.)", label_visibility="collapsed")
+    st.markdown("**나. 탐구 동기 및 배경\n1) 교과 연계 동기**")
+    motive_1 = st.text_area("교과 연계 동기", value=ans.get("motive_1", ""), placeholder="어떤 과목, 어떤 단원 수업 중 의문이 생겼나요? 구체적으로 서술하세요.", label_visibility="collapsed")
+    st.markdown("**2) 선정 배경**")
+    motive_2 = st.text_area("선정 배경", value=ans.get("motive_2", ""), placeholder="왜 이 주제를 골랐나요? 평소 흥미나 사회 문제와 연결해 보세요.", label_visibility="collapsed")
+    st.markdown("**3) 탐구 목적**")
+    purpose = st.text_area("탐구 목적", value=ans.get("purpose", ""), placeholder="이 탐구로 최종적으로 무엇을 알아내거나 해결하려 하나요?", label_visibility="collapsed")
+    st.markdown("**4) 이론적 배경**")
+    
+    default_bg_df = pd.DataFrame([{"구분": "핵심 용어의 뜻", "내용": "(활동지2의 2단계 교과 개념을 사전과 교과서 정의로 정리)"}, {"구분": "참고한 자료 요약", "내용": "(관련 책, 기사, 논문에서 알게 된 내용을 2~3줄로 정리)"}])
+    bg_df = pd.DataFrame(ans.get("bg_df", default_bg_df.to_dict('records')))
+    edited_bg_df = st.data_editor(bg_df, hide_index=True, use_container_width=True, num_rows="dynamic", key="act5_bg_df")
 
-        st.markdown("---")
-        st.markdown("#### 3. 탐구 설계 및 내용\n**가. 탐구 방법**")
-        methods = ["문헌연구(비교분석)", "데이터분석", "설문/인터뷰", "실험", "기타"]
-        selected_methods = st.multiselect("탐구 방법 선택", methods, default=ans.get("selected_methods", []))
-        st.markdown("**나. 세부 절차**")
-        default_proc_df = pd.DataFrame([{"순서": "1", "한 일": "(예: 조사 대상과 범위 정하기)"}, {"순서": "2", "한 일": "(예: 자료 수집, 설문 실시, 실험 진행)"}, {"순서": "3", "한 일": "(예: 결과 정리 및 표나 그래프로 나타내기)"}, {"순서": "4", "한 일": "(예: 결과 해석하기)"}])
-        proc_df = pd.DataFrame(ans.get("proc_df", default_proc_df.to_dict('records')))
-        edited_proc_df = st.data_editor(proc_df, hide_index=True, use_container_width=True, num_rows="dynamic", key="act5_proc_df")
-        st.markdown("**다. 탐구 내용 (본론)**")
-        content_body = st.text_area("탐구 내용 (본론)", value=ans.get("content_body", ""), placeholder="수집한 자료나 데이터를 바탕으로 실제로 알아낸 내용을 씁니다.", height=200, label_visibility="collapsed")
-        st.markdown("**라. 탐구 결과\n1) 결과 요약**")
-        result_summary = st.text_area("결과 요약", value=ans.get("result_summary", ""), placeholder="알아낸 사실이나 데이터 중 핵심만 간단히", label_visibility="collapsed")
-        st.markdown("**2) 해석 및 의의**")
-        result_meaning = st.text_area("해석 및 의의", value=ans.get("result_meaning", ""), placeholder="그 결과가 무엇을 뜻하는지, 예상과 어떻게 달랐는지 나의 생각을 쓰세요.", label_visibility="collapsed")
+    st.markdown("---")
+    st.markdown("#### 3. 탐구 설계 및 내용\n**가. 탐구 방법**")
+    methods = ["문헌연구(비교분석)", "데이터분석", "설문/인터뷰", "실험", "기타"]
+    selected_methods = st.multiselect("탐구 방법 선택", methods, default=ans.get("selected_methods", []))
+    st.markdown("**나. 세부 절차**")
+    default_proc_df = pd.DataFrame([{"순서": "1", "한 일": "(예: 조사 대상과 범위 정하기)"}, {"순서": "2", "한 일": "(예: 자료 수집, 설문 실시, 실험 진행)"}, {"순서": "3", "한 일": "(예: 결과 정리 및 표나 그래프로 나타내기)"}, {"순서": "4", "한 일": "(예: 결과 해석하기)"}])
+    proc_df = pd.DataFrame(ans.get("proc_df", default_proc_df.to_dict('records')))
+    edited_proc_df = st.data_editor(proc_df, hide_index=True, use_container_width=True, num_rows="dynamic", key="act5_proc_df")
+    st.markdown("**다. 탐구 내용 (본론)**")
+    content_body = st.text_area("탐구 내용 (본론)", value=ans.get("content_body", ""), placeholder="수집한 자료나 데이터를 바탕으로 실제로 알아낸 내용을 씁니다.", height=200, label_visibility="collapsed")
+    st.markdown("**라. 탐구 결과\n1) 결과 요약**")
+    result_summary = st.text_area("결과 요약", value=ans.get("result_summary", ""), placeholder="알아낸 사실이나 데이터 중 핵심만 간단히", label_visibility="collapsed")
+    st.markdown("**2) 해석 및 의의**")
+    result_meaning = st.text_area("해석 및 의의", value=ans.get("result_meaning", ""), placeholder="그 결과가 무엇을 뜻하는지, 예상과 어떻게 달랐는지 나의 생각을 쓰세요.", label_visibility="collapsed")
 
-        st.markdown("---")
-        st.markdown("#### 4. 결론 및 제언\n**가. 결론**")
-        conclusion = st.text_area("결론", value=ans.get("conclusion", ""), placeholder="탐구 목적을 달성했는지 확인하고, 최종 답을 한두 문장으로 정리하세요.", label_visibility="collapsed")
-        st.markdown("**나. 성찰\n1) 배우고 느낀 점**")
-        reflection_1 = st.text_area("배우고 느낀 점", value=ans.get("reflection_1", ""), placeholder="새로 알게 된 지식, 깨달음, 내가 기울인 노력", label_visibility="collapsed")
-        st.markdown("**2) 한계점**")
-        reflection_2 = st.text_area("한계점", value=ans.get("reflection_2", ""), placeholder="아쉬웠던 점과 부족했던 부분", label_visibility="collapsed")
-        st.markdown("**다. 후속 활동**")
-        next_step = st.text_area("후속 활동", value=ans.get("next_step", ""), placeholder="이 탐구를 발전시켜 더 알아보고 싶은 것, 읽어 볼 책을 적으세요.", label_visibility="collapsed")
+    st.markdown("---")
+    st.markdown("#### 4. 결론 및 제언\n**가. 결론**")
+    conclusion = st.text_area("결론", value=ans.get("conclusion", ""), placeholder="탐구 목적을 달성했는지 확인하고, 최종 답을 한두 문장으로 정리하세요.", label_visibility="collapsed")
+    st.markdown("**나. 성찰\n1) 배우고 느낀 점**")
+    reflection_1 = st.text_area("배우고 느낀 점", value=ans.get("reflection_1", ""), placeholder="새로 알게 된 지식, 깨달음, 내가 기울인 노력", label_visibility="collapsed")
+    st.markdown("**2) 한계점**")
+    reflection_2 = st.text_area("한계점", value=ans.get("reflection_2", ""), placeholder="아쉬웠던 점과 부족했던 부분", label_visibility="collapsed")
+    st.markdown("**다. 후속 활동**")
+    next_step = st.text_area("후속 활동", value=ans.get("next_step", ""), placeholder="이 탐구를 발전시켜 더 알아보고 싶은 것, 읽어 볼 책을 적으세요.", label_visibility="collapsed")
 
-        st.markdown("---")
-        st.markdown("#### 5. 참고 문헌\n**가. 논문/도서**")
-        ref_book = st.text_area("논문/도서", value=ans.get("ref_book", ""), placeholder="저자, 제목, 출판사(발행처), 발행연도, 페이지", label_visibility="collapsed")
-        st.markdown("**나. 웹사이트/기사**")
-        ref_web = st.text_area("웹사이트/기사", value=ans.get("ref_web", ""), placeholder="사이트명, 기사 제목, URL, 접속일자", label_visibility="collapsed")
+    st.markdown("---")
+    st.markdown("#### 5. 참고 문헌\n**가. 논문/도서**")
+    ref_book = st.text_area("논문/도서", value=ans.get("ref_book", ""), placeholder="저자, 제목, 출판사(발행처), 발행연도, 페이지", label_visibility="collapsed")
+    st.markdown("**나. 웹사이트/기사**")
+    ref_web = st.text_area("웹사이트/기사", value=ans.get("ref_web", ""), placeholder="사이트명, 기사 제목, URL, 접속일자", label_visibility="collapsed")
 
-        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            with db_lock:
-                current_data = load_json(DATA_FILE, {})
-                if user_key not in current_data: current_data[user_key] = {}
-                current_data[user_key][category] = {
-                    "is_custom_act5": True, "info_course": info_course, "info_date": info_date, "info_school": info_school, "info_career": info_career,
-                    "info_name": info_name, "info_subject": info_subject, "info_method": info_method, "info_topic": info_topic,
-                    "topic_title": topic_title, "motive_1": motive_1, "motive_2": motive_2, "purpose": purpose,
-                    "bg_df": edited_bg_df.to_dict('records'), "selected_methods": selected_methods, "proc_df": edited_proc_df.to_dict('records'),
-                    "content_body": content_body, "result_summary": result_summary, "result_meaning": result_meaning,
-                    "conclusion": conclusion, "reflection_1": reflection_1, "reflection_2": reflection_2,
-                    "next_step": next_step, "ref_book": ref_book, "ref_web": ref_web
-                }
-                save_json(DATA_FILE, current_data)
-            st.toast("🎉 저장되었습니다!")
+    if st.button("활동지 최종 제출 및 저장", key="btn_act5", type="primary"):
+        with db_lock:
+            current_data = load_json(DATA_FILE, {})
+            if user_key not in current_data: current_data[user_key] = {}
+            current_data[user_key][category] = {
+                "is_custom_act5": True, "info_course": info_course, "info_date": info_date, "info_school": info_school, "info_career": info_career,
+                "info_name": info_name, "info_subject": info_subject, "info_method": info_method, "info_topic": info_topic,
+                "topic_title": topic_title, "motive_1": motive_1, "motive_2": motive_2, "purpose": purpose,
+                "bg_df": edited_bg_df.to_dict('records'), "selected_methods": selected_methods, "proc_df": edited_proc_df.to_dict('records'),
+                "content_body": content_body, "result_summary": result_summary, "result_meaning": result_meaning,
+                "conclusion": conclusion, "reflection_1": reflection_1, "reflection_2": reflection_2,
+                "next_step": next_step, "ref_book": ref_book, "ref_web": ref_web
+            }
+            save_json(DATA_FILE, current_data)
+        show_success_message()
+    render_download_button(user_key, category)
 
 def render_activity8_form(user_key):
     category = ACTIVITIES[7]
     ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
-    with st.form(key=f"form_{category}_{user_key}"):
-        st.caption("※ 첫 번째 열(항목)은 양식 제목이므로 수정하지 마세요.")
-        default_df = pd.DataFrame([
-            {"항목": "1. 탐구 주제", "내용": ""}, {"항목": "2. [의문] 주제 선정 동기", "내용": ""},
-            {"항목": "3. [문제해결] 과정 및 결과 요약", "내용": ""}, {"항목": "4. 활동에서 자신의 역할과 노력", "내용": ""},
-            {"항목": "5. 배우고 느낀 점", "내용": ""}, {"항목": "6. 새롭게 알게 된 것", "내용": ""}, {"항목": "7. 후속 활동 계획", "내용": ""}
-        ])
-        df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
-        edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["항목"], key=f"df_{category}")
-        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            with db_lock:
-                current_data = load_json(DATA_FILE, {})
-                if user_key not in current_data: current_data[user_key] = {}
-                current_data[user_key][category] = {"is_custom_self_eval": True, "df1": edited_df.to_dict('records')}
-                save_json(DATA_FILE, current_data)
-            st.toast("🎉 저장되었습니다!")
+    st.caption("※ 첫 번째 열(항목)은 양식 제목이므로 수정하지 마세요.")
+    default_df = pd.DataFrame([
+        {"항목": "1. 탐구 주제", "내용": ""}, {"항목": "2. [의문] 주제 선정 동기", "내용": ""},
+        {"항목": "3. [문제해결] 과정 및 결과 요약", "내용": ""}, {"항목": "4. 활동에서 자신의 역할과 노력", "내용": ""},
+        {"항목": "5. 배우고 느낀 점", "내용": ""}, {"항목": "6. 새롭게 알게 된 것", "내용": ""}, {"항목": "7. 후속 활동 계획", "내용": ""}
+    ])
+    df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
+    edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["항목"], key=f"df_{category}")
+    if st.button("활동지 최종 제출 및 저장", key="btn_act8", type="primary"):
+        with db_lock:
+            current_data = load_json(DATA_FILE, {})
+            if user_key not in current_data: current_data[user_key] = {}
+            current_data[user_key][category] = {"is_custom_self_eval": True, "df1": edited_df.to_dict('records')}
+            save_json(DATA_FILE, current_data)
+        show_success_message()
+    render_download_button(user_key, category)
 
 def render_activity9_form(user_key):
     category = ACTIVITIES[8]
     ans = load_json(DATA_FILE, {}).get(user_key, {}).get(category, {})
-    with st.form(key=f"form_{category}_{user_key}"):
-        st.markdown("#### 1. 꼬리에 꼬리를 무는 독서")
-        st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
-        default_df1 = pd.DataFrame([
-            {"구분": "기초 도서\n(흥미/입문)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "이 책의 ____________ 부분을 읽고 ____________ 개념에 흥미를 가짐."},
-            {"구분": "심화 도서\n(전공/이론)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "위 책에서 생긴 ____________ 에 대한 궁금증을 해결하기 위해 선정함."},
-            {"구분": "확장 도서\n(융합/원서)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "관련 해외 원서나 논문을 읽고 ____________ 관점까지 확장함."}
-        ])
-        df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
-        edited_df1 = st.data_editor(df1, hide_index=True, use_container_width=True, disabled=["구분"], key="act9_df1")
+    
+    st.markdown("#### 1. 꼬리에 꼬리를 무는 독서")
+    st.caption("※ 첫 번째 열(구분)은 양식 제목이므로 수정하지 마세요.")
+    default_df1 = pd.DataFrame([
+        {"구분": "기초 도서\n(흥미/입문)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "이 책의 ____________ 부분을 읽고 ____________ 개념에 흥미를 가짐."},
+        {"구분": "심화 도서\n(전공/이론)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "위 책에서 생긴 ____________ 에 대한 궁금증을 해결하기 위해 선정함."},
+        {"구분": "확장 도서\n(융합/원서)", "도서명 / 저자": "", "선정 이유 (탐구 활동과의 연결고리)": "관련 해외 원서나 논문을 읽고 ____________ 관점까지 확장함."}
+    ])
+    df1 = pd.DataFrame(ans.get("df1", default_df1.to_dict('records')))
+    edited_df1 = st.data_editor(df1, hide_index=True, use_container_width=True, disabled=["구분"], key="act9_df1")
 
-        st.markdown("#### 2. 나만의 3개년 실천 로드맵")
-        st.caption("※ 첫 번째와 두 번째 열은 양식 제목이므로 수정하지 마세요.")
-        default_df2 = pd.DataFrame([
-            {"시기": "1학년\n(겨울방학)", "중점 목표": "기초 역량\n& 진로 탐색", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "},
-            {"시기": "2학년\n(1학기)", "중점 목표": "구체적 주제\n심화 탐구", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "},
-            {"시기": "2학년\n(2학기/겨울)", "중점 목표": "전공 적합성\n증명 & 융합", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "},
-            {"시기": "3학년\n(1학기)", "중점 목표": "완성\n& 면접 대비", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "}
-        ])
-        df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
-        edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["시기", "중점 목표"], key="act9_df2")
+    st.markdown("#### 2. 나만의 3개년 실천 로드맵")
+    st.caption("※ 첫 번째와 두 번째 열은 양식 제목이므로 수정하지 마세요.")
+    default_df2 = pd.DataFrame([
+        {"시기": "1학년\n(겨울방학)", "중점 목표": "기초 역량\n& 진로 탐색", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "},
+        {"시기": "2학년\n(1학기)", "중점 목표": "구체적 주제\n심화 탐구", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "},
+        {"시기": "2학년\n(2학기/겨울)", "중점 목표": "전공 적합성\n증명 & 융합", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "},
+        {"시기": "3학년\n(1학기)", "중점 목표": "완성\n& 면접 대비", "주요 활동 계획 (주제탐구, 독서, 실험 등)": "□ \n□ \n□ \n□ "}
+    ])
+    df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
+    edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["시기", "중점 목표"], key="act9_df2")
 
-        if st.form_submit_button("활동지 최종 제출 및 저장", type="primary"):
-            with db_lock:
-                current_data = load_json(DATA_FILE, {})
-                if user_key not in current_data: current_data[user_key] = {}
-                current_data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
-                save_json(DATA_FILE, current_data)
-            st.toast("🎉 저장되었습니다!")
+    if st.button("활동지 최종 제출 및 저장", key="btn_act9", type="primary"):
+        with db_lock:
+            current_data = load_json(DATA_FILE, {})
+            if user_key not in current_data: current_data[user_key] = {}
+            current_data[user_key][category] = {"is_custom_roadmap": True, "df1": edited_df1.to_dict('records'), "df2": edited_df2.to_dict('records')}
+            save_json(DATA_FILE, current_data)
+        show_success_message()
+    render_download_button(user_key, category)
 
 # --- 캠프 종합 공지 렌더링 ---
 def render_camp_overview(current_role, current_hub):
@@ -453,11 +586,9 @@ def render_camp_overview(current_role, current_hub):
     link_style = "font-size: 18px; font-weight: bold; color: #0056b3; text-decoration: none; display: block; margin-bottom: 10px;"
     col1, col2 = st.columns(2)
     with col1:
-        with st.expander("👥 모둠 구성 및 사전 안내", expanded=True):
-            st.markdown(f"<a href='#' target='_blank' style='{link_style}'>🔗 모둠 구성 확인하기 (구글 문서)</a>", unsafe_allow_html=True)
+        with st.expander("👥 캠프 사전 안내", expanded=True):
             st.markdown(f"<a href='https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11' target='_blank' style='{link_style}'>🔗 캠프 사전 안내 노션 사이트</a>", unsafe_allow_html=True)
             st.markdown(f"<a href='https://forms.gle/4Co5GLdD3M6KEVcs8' target='_blank' style='{link_style}'>🔗 사전 설문조사 [구글 폼]</a>", unsafe_allow_html=True)
-            st.markdown(f"<a href='https://app.notion.com/p/edu4/2db3915462468039bd00f09b7aec4aff?v=2db391546246803bb2ac000c0627bb1e&source=copy_link&assetsVersion=23.13.20260719.0332&clientBuildTarget=client' target='_blank' style='{link_style}'>🔗 신정고 캠프 학생 결과물 모음</a>", unsafe_allow_html=True)
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
@@ -468,13 +599,10 @@ def render_camp_overview(current_role, current_hub):
             st.markdown(f"<a href='https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing' target='_blank' style='{link_style}'>📁 대학 전공 가이드북 구글 드라이브 폴더 열기</a>", unsafe_allow_html=True)
         with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
             st.markdown(f"<a href='https://forms.gle/kqjWnsTE65Jf8QCS6' target='_blank' style='{link_style}'>🔗 캠프 만족도 조사 참여하기 (Google Forms)</a>", unsafe_allow_html=True)
-            qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
-            if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
 
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
-# 💡 사이드바 가독성 상향 CSS
 st.markdown("""
 <style>
 [data-testid="stFormSubmitButton"] button, button[kind="primary"] {
@@ -554,7 +682,6 @@ table td {
     font-weight: 600 !important;
 }
 
-/* 사이드바 텍스트 크기/진하기 보강 */
 [data-testid="stSidebar"] .stMarkdown p,
 [data-testid="stSidebar"] .stSelectbox label p,
 [data-testid="stSidebar"] .stTextInput label p,
@@ -573,7 +700,25 @@ table td {
 
 init_system()
 
-if "logged_in" not in st.session_state: st.session_state.logged_in = False; st.session_state.user_info = None
+if "logged_in" not in st.session_state: 
+    st.session_state.logged_in = False
+    st.session_state.user_info = None
+
+if not st.session_state.logged_in and "session_token" in st.query_params:
+    token = st.query_params["session_token"]
+    user_key, login_hub = decode_token(token)
+    
+    if user_key:
+        users = load_json(USERS_FILE, {})
+        if user_key in ADMIN_ACCOUNTS:
+            admin_info = ADMIN_ACCOUNTS[user_key]
+            st.session_state.logged_in = True
+            st.session_state.user_info = {"user_key": user_key, "username": user_key, "name": admin_info["name"], "role": "관리자", "school": admin_info["school"], "class_group": "관리자", "hub_school": login_hub}
+        elif user_key in users and users[user_key].get("approved", False):
+            db_role = users[user_key].get("role")
+            st.session_state.logged_in = True
+            st.session_state.user_info = {"user_key": user_key, "username": users[user_key].get("id", ""), "name": users[user_key].get("name", "이름없음"), "role": db_role, "school": users[user_key].get("school", "소속없음"), "class_group": users[user_key].get("class_group", "미배정"), "hub_school": login_hub}
+
 if "current_page" not in st.session_state: st.session_state.current_page = "main"
 
 st.sidebar.title("🔒 인증 센터")
@@ -597,7 +742,11 @@ if st.session_state.logged_in:
     """, unsafe_allow_html=True)
     
     if st.sidebar.button("로그아웃", use_container_width=True):
-        st.session_state.logged_in = False; st.session_state.user_info = None; st.session_state.current_page = "main"; st.rerun()
+        st.session_state.logged_in = False
+        st.session_state.user_info = None
+        st.session_state.current_page = "main"
+        if "session_token" in st.query_params: del st.query_params["session_token"]
+        st.rerun()
 else:
     auth_choice = st.sidebar.radio("원하는 작업을 선택하세요", ["회원가입", "로그인"])
     users = load_json(USERS_FILE, {})
@@ -619,8 +768,6 @@ else:
         if st.sidebar.button("가입 신청", type="primary", use_container_width=True):
             if reg_role and reg_id and reg_pw and reg_name and reg_school:
                 user_key = f"{reg_school}_{reg_id}" if reg_role == "학생" else f"teacher_{reg_id}"
-                
-                # 💡 [핵심 해결] 가입 시에도 락을 걸어서 40명이 동시에 가입 버튼을 눌러도 파일이 초기화되지 않도록 보호합니다.
                 with db_lock:
                     fresh_users = load_json(USERS_FILE, {}) 
                     if user_key in fresh_users: 
@@ -645,6 +792,7 @@ else:
                 admin_info = ADMIN_ACCOUNTS[input_id]
                 st.session_state.logged_in = True
                 st.session_state.user_info = {"user_key": input_id, "username": input_id, "name": admin_info["name"], "role": "관리자", "school": admin_info["school"], "class_group": "관리자", "hub_school": login_hub}
+                st.query_params["session_token"] = encode_token(input_id, login_hub)
                 st.rerun()
             else:
                 user_key = f"{login_school}_{input_id}" if login_type == "학생" else f"teacher_{input_id}"
@@ -655,6 +803,7 @@ else:
                             if users[user_key].get("approved", True):
                                 st.session_state.logged_in = True
                                 st.session_state.user_info = {"user_key": user_key, "username": users[user_key].get("id", input_id), "name": users[user_key].get("name", "이름없음"), "role": db_role, "school": users[user_key].get("school", "소속없음"), "class_group": users[user_key].get("class_group", "미배정"), "hub_school": login_hub}
+                                st.query_params["session_token"] = encode_token(user_key, login_hub)
                                 st.rerun()
                             else: st.sidebar.warning("⏳ 관리자(교사)의 가입 승인을 대기 중입니다.")
                         else: st.sidebar.error("❌ 선택하신 거점학교에 등록된 계정이 아닙니다.")
@@ -662,7 +811,7 @@ else:
                 else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("<div style='text-align: center; color: #222; font-size: 15px; font-weight: 900;'>🧑‍💻 만든 이:<br><span style='font-size: 20px; color: #000;'>G.E.M.S</span><br><span style='font-size: 13px;'>(울산교육청 진학지원단)</span></div>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='text-align: center; color: #222; font-size: 15px; font-weight: 900;'>🧑‍💻 만든 이:<br><span style='font-size: 20px; color: #000;'>Made by G.E.M.S</span><br><span style='font-size: 13px;'>(울산교육청 진학지원단)</span></div>", unsafe_allow_html=True)
 
 # --- [5] 화면 분기 로직 ---
 if not st.session_state.logged_in:
@@ -681,17 +830,21 @@ else:
         st.title(f"📄 {act_name}")
         st.markdown("---")
         
+        # 💡 [요청 반영] 교사(관리자)도 학생과 동일한 활동지 화면을 볼 수 있도록 개방
         if current_role == "학생":
-            if act_name == ACTIVITIES[0]: render_activity1_form(current_user_key)
-            elif act_name == ACTIVITIES[1]: render_activity2_form(current_user_key)
-            elif act_name == ACTIVITIES[2]: render_activity3_form(current_user_key)
-            elif act_name == ACTIVITIES[3]: render_activity4_form(current_user_key)
-            elif act_name == ACTIVITIES[4]: render_activity5_form(current_user_key)
-            elif act_name == ACTIVITIES[5]: render_activity6_form(current_user_key)
-            elif act_name == ACTIVITIES[6]: render_activity7_form(current_user_key)
-            elif act_name == ACTIVITIES[7]: render_activity8_form(current_user_key)
-            elif act_name == ACTIVITIES[8]: render_activity9_form(current_user_key)
-        else: st.warning("교사/관리자는 메인 화면의 '제출 모니터링 탭'을 이용해주세요.")
+            st.warning("🚨 [임시 데이터 저장 안내] 작성 중 화면 바깥을 클릭하면 임시로 남아있지만, 새로고침 시 날아갈 수 있습니다. 완전히 저장하려면 반드시 맨 아래의 **[제출 및 저장]** 버튼을 틈틈이 눌러주세요!")
+        else:
+            st.info("👨‍🏫 **[교사용 미리보기 모드]** 학생들과 동일한 활동지 화면입니다. 내용을 확인하고 테스트 입력/저장도 가능합니다.")
+
+        if act_name == ACTIVITIES[0]: render_activity1_form(current_user_key)
+        elif act_name == ACTIVITIES[1]: render_activity2_form(current_user_key)
+        elif act_name == ACTIVITIES[2]: render_activity3_form(current_user_key)
+        elif act_name == ACTIVITIES[3]: render_activity4_form(current_user_key)
+        elif act_name == ACTIVITIES[4]: render_activity5_form(current_user_key)
+        elif act_name == ACTIVITIES[5]: render_activity6_form(current_user_key)
+        elif act_name == ACTIVITIES[6]: render_activity7_form(current_user_key)
+        elif act_name == ACTIVITIES[7]: render_activity8_form(current_user_key)
+        elif act_name == ACTIVITIES[8]: render_activity9_form(current_user_key)
         
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown('<div class="back-btn-wrapper"></div>', unsafe_allow_html=True)
@@ -700,6 +853,18 @@ else:
 
     elif st.session_state.current_page == "main":
         if current_role == "학생":
+            st.info("💡 **AI 도구(Gemini 등) 활용 팁:** 아래 버튼을 눌러 나의 전체 활동 내역을 다운로드한 뒤, AI 채팅창에 파일을 끌어다 넣고 **'이 내용을 바탕으로 발표 자료 목차를 짜줘'**라고 질문해 보세요!")
+            current_data = load_json(DATA_FILE, {})
+            student_answers = current_data.get(current_user_key, {})
+            full_html = generate_html_report(st.session_state.user_info, student_answers, target_act=None, app_config=app_config)
+            st.download_button(label="📥 나의 전체 활동 포트폴리오 다운로드 (HTML)",
+                               data=full_html.encode('utf-8-sig'),
+                               file_name=f"{st.session_state.user_info['name']}_전체포트폴리오.html",
+                               mime="text/html",
+                               type="primary",
+                               use_container_width=True)
+            st.markdown("---")
+
             tabs_list = ["📌 캠프 공지 및 자료실"] + app_config["tabs"]
             tabs_objects = st.tabs(tabs_list)
             with tabs_objects[0]: render_camp_overview(current_role, current_hub)
@@ -710,28 +875,27 @@ else:
                     st.markdown("---")
                     questions = app_config["questions"].get(tab_name, [])
                     
-                    with st.form(key=f"form_{current_user_key}_{tab_name}"):
-                        st.markdown("<div style='color:#555; margin-bottom:10px;'>아래 질문들에 대한 답변을 텍스트로 작성한 후, 맨 아래의 <b>[제출 및 저장하기]</b> 버튼을 눌러주세요.</div>", unsafe_allow_html=True)
-                        ans_dict = {}
-                        for q in questions:
-                            q_id = q["id"]
-                            q_label = q["label"]
-                            ans_data = learning_data.get(current_user_key, {}).get(tab_name, {}).get(q_id, {})
-                            existing_text = ans_data.get("text", "") if isinstance(ans_data, dict) else ans_data
-                            
-                            st.markdown(f"**{q_label}**")
-                            ans_dict[q_id] = st.text_area("내용 작성", value=existing_text, height=150, key=f"text_{current_user_key}_{tab_name}_{q_id}", label_visibility="collapsed")
-                            st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown("<div style='color:#555; margin-bottom:10px;'>아래 질문들에 대한 답변을 텍스트로 작성한 후, 맨 아래의 <b>[제출 및 저장하기]</b> 버튼을 눌러주세요.</div>", unsafe_allow_html=True)
+                    ans_dict = {}
+                    for q in questions:
+                        q_id = q["id"]
+                        q_label = q["label"]
+                        ans_data = learning_data.get(current_user_key, {}).get(tab_name, {}).get(q_id, {})
+                        existing_text = ans_data.get("text", "") if isinstance(ans_data, dict) else ans_data
                         
-                        if st.form_submit_button("제출 및 저장하기", type="primary"):
-                            with db_lock: # 💡 동시 접속 완벽 보호
-                                fresh_data = load_json(DATA_FILE, {}) 
-                                if current_user_key not in fresh_data: fresh_data[current_user_key] = {}
-                                if tab_name not in fresh_data[current_user_key]: fresh_data[current_user_key][tab_name] = {}
-                                for q_id, text_val in ans_dict.items():
-                                    fresh_data[current_user_key][tab_name][q_id] = {"text": text_val, "link": "", "file_name": "", "file_path": ""}
-                                save_json(DATA_FILE, fresh_data)
-                            st.toast(f"💾 {tab_name} 자료가 성공적으로 저장되었습니다!")
+                        st.markdown(f"**{q_label}**")
+                        ans_dict[q_id] = st.text_area("내용 작성", value=existing_text, height=150, key=f"text_{current_user_key}_{tab_name}_{q_id}", label_visibility="collapsed")
+                        st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    if st.button("제출 및 저장하기", key=f"btn_tab_{tab_name}", type="primary"):
+                        with db_lock:
+                            fresh_data = load_json(DATA_FILE, {}) 
+                            if current_user_key not in fresh_data: fresh_data[current_user_key] = {}
+                            if tab_name not in fresh_data[current_user_key]: fresh_data[current_user_key][tab_name] = {}
+                            for q_id, text_val in ans_dict.items():
+                                fresh_data[current_user_key][tab_name][q_id] = {"text": text_val, "link": "", "file_name": "", "file_path": ""}
+                            save_json(DATA_FILE, fresh_data)
+                        show_success_message()
 
         elif current_role in ["교사", "관리자"]:
             st.title(f"🛠️ {current_role} 대시보드 ({current_hub})")
@@ -910,128 +1074,67 @@ else:
                                     st.success("삭제 완료."); st.rerun()
 
             with menu_tabs[-1]:
-                st.subheader("📥 반별 학생 학습 활동 및 제출 자료 조회")
+                col_title, col_btn = st.columns([8, 2])
+                with col_title:
+                    st.subheader("📥 학생 학습 활동 및 제출 자료 실시간 조회")
+                with col_btn:
+                    if st.button("🔄 실시간 새로고침", type="primary", use_container_width=True):
+                        st.rerun()
+                
                 all_users = load_json(USERS_FILE, {})
+                learning_data = load_json(DATA_FILE, {})
+                
                 filter_class = st.radio("조회할 반 선택", ["전체 보기"] + CLASS_GROUPS, horizontal=True)
                 
                 student_list = [uid for uid, info in all_users.items() if info.get("role") == "학생" and info.get("hub_school", "호계고등학교") == current_hub and (filter_class == "전체 보기" or filter_class == info.get("class_group", "미배정"))]
                 
                 if not student_list: st.info(f"선택하신 조건({filter_class})에 해당하는 가입 학생이 없습니다.")
                 else:
-                    view_mode = st.radio("조회 모드 선택", ["👤 특정 학생 집중 분석", "📅 항목별(활동지/차시) 전체 현황 (엑셀 다운로드)"], horizontal=True)
+                    view_mode = st.radio("조회 모드 선택", ["👤 특정 학생 실시간 집중 분석", "📅 항목별(활동지/차시) 전체 현황 (엑셀 다운로드)"], horizontal=True)
                     st.markdown("---")
                     
-                    if view_mode == "👤 특정 학생 집중 분석":
+                    if view_mode == "👤 특정 학생 실시간 집중 분석":
+                        
+                        st.subheader("📦 전체 학생 포트폴리오 일괄 다운로드")
+                        st.info("💡 현재 조회된 조건(반)에 해당하는 모든 학생의 포트폴리오(HTML)를 하나의 압축 파일(ZIP)로 한 번에 다운로드합니다.")
+                        
+                        zip_buffer = io.BytesIO()
+                        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                            for s_uid in student_list:
+                                s_info = all_users[s_uid]
+                                s_info_for_html = s_info.copy()
+                                s_info_for_html['username'] = s_uid.split('_')[-1]
+                                s_answers = learning_data.get(s_uid, {})
+                                s_html = generate_html_report(s_info_for_html, s_answers, target_act=None, app_config=app_config)
+                                
+                                safe_file_name = f"{s_info.get('class_group', '미배정')}_{s_info.get('name', '이름없음')}_{s_info_for_html['username']}.html"
+                                zip_file.writestr(safe_file_name, s_html.encode('utf-8-sig'))
+                        
+                        st.download_button(
+                            label=f"📦 [{filter_class}] 학생 {len(student_list)}명 전체 포트폴리오 일괄 다운로드 (ZIP)",
+                            data=zip_buffer.getvalue(),
+                            file_name=f"주제탐구캠프_포트폴리오_{filter_class}.zip",
+                            mime="application/zip",
+                            type="primary",
+                            use_container_width=True
+                        )
+                        
+                        st.markdown("---")
+                        st.subheader("👤 특정 학생 개별 조회 및 다운로드")
+                        
                         selected_student = st.selectbox("학생 선택", student_list, format_func=lambda x: f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('school', '-')} {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if selected_student:
                             student_answers = learning_data.get(selected_student, {})
-                            st.info("💡 다운로드한 파일을 더블클릭하여 인터넷 창으로 연 뒤, **[우클릭] -> [인쇄] -> [PDF로 저장]**을 누르시면 화면 깨짐 없이 완벽한 PDF 문서가 만들어집니다.")
                             
-                            html_content = f"""<!DOCTYPE html>
-                            <html lang="ko">
-                            <head>
-                            <meta charset="UTF-8">
-                            <title>학습 포트폴리오</title>
-                            <style>
-                                body {{ font-family: 'Malgun Gothic', dotum, sans-serif; padding: 40px; line-height: 1.6; color: #333; }}
-                                h1 {{ text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 40px; }}
-                                h2 {{ color: #2c3e50; border-left: 5px solid #3498db; padding-left: 10px; margin-top: 40px; }}
-                                h3 {{ color: #2980b9; margin-top: 20px; }}
-                                h4 {{ color: #34495e; margin-top: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }}
-                                table {{ width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; font-size: 14px; }}
-                                th, td {{ border: 1px solid #bdc3c7; padding: 10px; text-align: left; }}
-                                th {{ background-color: #ecf0f1; font-weight: bold; text-align: center; }}
-                                .content-box {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #e9ecef; margin-bottom: 20px; white-space: pre-wrap; }}
-                                .link-text {{ color: #e74c3c; font-weight: bold; text-decoration: none; }}
-                            </style>
-                            </head>
-                            <body>
-                                <h1>📚 학습 포트폴리오</h1>
-                                <div style="text-align: right; margin-bottom: 30px; font-size: 16px;">
-                                    <strong>학교:</strong> {all_users[selected_student].get('school', '')}<br>
-                                    <strong>소속:</strong> {all_users[selected_student].get('class_group', '')}<br>
-                                    <strong>이름:</strong> {all_users[selected_student].get('name', '')} ({all_users[selected_student].get('id', '')})
-                                </div>
-                                <h2>📑 [1] 활동지 작성 내역</h2>
-                            """
+                            u_info_for_html = all_users[selected_student]
+                            u_info_for_html['username'] = selected_student.split('_')[-1]
+                            html_content = generate_html_report(u_info_for_html, student_answers, target_act=None, app_config=app_config)
                             
-                            for act in ACTIVITIES:
-                                ans = student_answers.get(act, {})
-                                if not ans: continue
-                                
-                                if act == ACTIVITIES[0] and ans.get("is_custom"):
-                                    html_content += f"<h3>▶ {act}</h3><h4>[1단계] 추출한 핵심 내용 요소</h4><table><tr><th>학과/전공명</th><th>핵심 내용 요소</th></tr>"
-                                    for row in ans.get("df1", []): html_content += f"<tr><td>{row.get('학과/전공명', '')}</td><td>{row.get('핵심 내용 요소', '')}</td></tr>"
-                                    html_content += "</table><h4>[2단계] 생기부 탐구 내용 분석</h4><table><tr><th>구분</th><th>키워드1</th><th>키워드2</th><th>키워드3</th><th>키워드4</th><th>키워드5</th></tr>"
-                                    for row in ans.get("df2", []): html_content += f"<tr><td><b>{row.get('구분', '')}</b></td><td>{row.get('키워드1','')}</td><td>{row.get('키워드2','')}</td><td>{row.get('키워드3','')}</td><td>{row.get('키워드4','')}</td><td>{row.get('키워드5','')}</td></tr>"
-                                    html_content += f"</table><h4>[3단계] 탐구 주제 및 문제 인식</h4><div class='content-box'>{ans.get('step3', '')}</div>"
-                                elif act == ACTIVITIES[1] and ans.get("is_custom_act2"):
-                                    html_content += f"<h3>▶ {act}</h3><h4>[1단계] 관심에서 출발하기</h4><p><b>관심 있는 것:</b> {ans.get('step1_1', '')}</p><p><b>계기:</b> {ans.get('step1_2', '')}</p><table><tr><th>구분</th><th>내용</th></tr>"
-                                    for row in ans.get("df1", []): html_content += f"<tr><td>{row.get('구분', '')}</td><td>{row.get('내용', '')}</td></tr>"
-                                    html_content += "</table><h4>[2단계] 교과 개념에 닻 내리기</h4><table><tr><th>구분</th><th>내용</th></tr>"
-                                    for row in ans.get("df2", []): html_content += f"<tr><td>{row.get('구분', '')}</td><td>{row.get('내용', '')}</td></tr>"
-                                    html_content += f"</table><p><b>잠정적 탐구 방향:</b> {ans.get('step2_dir', '')}</p><h4>[3단계] 주제 적절성 자가 진단</h4><table><tr><th>점검 항목</th><th>점검 질문</th><th>좋은 예</th><th>판단 (O/X)</th></tr>"
-                                    for row in ans.get("df3", []): html_content += f"<tr><td>{row.get('점검 항목', '')}</td><td>{row.get('점검 질문', '')}</td><td>{row.get('좋은 예', '')}</td><td>{row.get('판단 (O/X)', '')}</td></tr>"
-                                    html_content += "</table><h4>[4단계] 막연한 주제를 학술적 질문으로 바꾸기</h4>"
-                                    html_content += f"<p><b>선택한 렌즈:</b> {ans.get('step4_1', '')}</p><p><b>핵심 탐구 질문:</b> {ans.get('step4_2', '')}</p><h4>[5단계] 탐구 전략 하나 정하기</h4>"
-                                    html_content += f"<p><b>선택한 전략:</b> {ans.get('step5_1', '')}</p><p><b>구체적인 접근 방법:</b> {ans.get('step5_2', '')}</p><h4>[6단계] AI 멘토에게 점검받기</h4>"
-                                    html_content += f"<div class='content-box'><b>반영할 점:</b><br>{ans.get('step6', '')}</div><h4>[7단계] 나의 탐구 계획 완성하기</h4><table><tr><th>항목</th><th>내용</th></tr>"
-                                    for row in ans.get("df7", []): html_content += f"<tr><td>{row.get('항목', '')}</td><td>{row.get('내용', '')}</td></tr>"
-                                    html_content += f"</table><p><b>요약:</b> 나는 <b>({ans.get('step7_s1', '')})</b> 개념을 활용해, <b>({ans.get('step7_s2', '')})</b> 전략으로 <b>({ans.get('step7_s3', '')})</b>을(를) 밝히려 한다.</p>"
-                                elif act in [ACTIVITIES[2], ACTIVITIES[5], ACTIVITIES[6]] and ans.get("is_custom_feedback"):
-                                    html_content += f"<h3>▶ {act}</h3><table><tr><th>구분</th><th>피드백 내용 (구체적으로)</th><th>보완 및 수정 계획</th></tr>"
-                                    for row in ans.get("df1", []): html_content += f"<tr><td><b>{row.get('구분','')}</b></td><td><pre>{row.get('피드백 내용 (구체적으로)','')}</pre></td><td><pre>{row.get('보완 및 수정 계획','')}</pre></td></tr>"
-                                    html_content += "</table>"
-                                elif act == ACTIVITIES[3] and ans.get("is_custom_refs"):
-                                    html_content += f"<h3>▶ {act}</h3><table><tr><th>사이트명</th><th>제목</th><th>내용</th><th>선정이유</th></tr>"
-                                    for row in ans.get("df1", []): html_content += f"<tr><td>{row.get('사이트명','')}</td><td>{row.get('제목','')}</td><td>{row.get('내용','')}</td><td>{row.get('선정이유','')}</td></tr>"
-                                    html_content += "</table>"
-                                elif act == ACTIVITIES[4] and ans.get("is_custom_act5"):
-                                    html_content += f"<h3>▶ {act}</h3><h4>1. 기본 정보</h4><table>"
-                                    html_content += f"<tr><th>교과명(강의명)</th><td>{ans.get('info_course', '')}</td><th>탐구 기간</th><td>{ans.get('info_date', '')}</td></tr>"
-                                    html_content += f"<tr><th>소속학교</th><td>{ans.get('info_school', '')}</td><th>진로 희망</th><td>{ans.get('info_career', '')}</td></tr>"
-                                    html_content += f"<tr><th>학번/이름</th><td>{ans.get('info_name', '')}</td><th>관련 교과, 단원</th><td>{ans.get('info_subject', '')}</td></tr>"
-                                    html_content += f"<tr><th>탐구 방법</th><td>{ans.get('info_method', '')}</td><th>탐구 주제</th><td>{ans.get('info_topic', '')}</td></tr></table>"
-                                    html_content += f"<h4>2. 탐구 개요</h4><p><b>가. 탐구 주제:</b> {ans.get('topic_title', '')}</p><p><b>나. 탐구 동기 및 배경</b></p>"
-                                    html_content += f"<p>1) 교과 연계 동기: {ans.get('motive_1', '')}</p><p>2) 선정 배경: {ans.get('motive_2', '')}</p><p>3) 탐구 목적: {ans.get('purpose', '')}</p><p>4) 이론적 배경:</p><table><tr><th>구분</th><th>내용</th></tr>"
-                                    for row in ans.get("bg_df", []): html_content += f"<tr><td>{row.get('구분', '')}</td><td>{row.get('내용', '')}</td></tr>"
-                                    html_content += f"</table><h4>3. 탐구 설계 및 내용</h4><p><b>가. 탐구 방법:</b> {', '.join(ans.get('selected_methods', []))}</p><p><b>나. 세부 절차:</b></p><table><tr><th>순서</th><th>한 일</th></tr>"
-                                    for row in ans.get("proc_df", []): html_content += f"<tr><td>{row.get('순서', '')}</td><td>{row.get('한 일', '')}</td></tr>"
-                                    html_content += f"</table><p><b>다. 탐구 내용 (본론):</b></p><div class='content-box'>{ans.get('content_body', '')}</div><p><b>라. 탐구 결과</b></p>"
-                                    html_content += f"<p>1) 결과 요약: {ans.get('result_summary', '')}</p><p>2) 해석 및 의의: {ans.get('result_meaning', '')}</p><h4>4. 결론 및 제언</h4>"
-                                    html_content += f"<p><b>가. 결론:</b> {ans.get('conclusion', '')}</p><p><b>나. 성찰</b></p><p>1) 배우고 느낀 점: {ans.get('reflection_1', '')}</p><p>2) 한계점: {ans.get('reflection_2', '')}</p>"
-                                    html_content += f"<p><b>다. 후속 활동:</b> {ans.get('next_step', '')}</p><h4>5. 참고 문헌</h4><p><b>가. 논문/도서:</b> {ans.get('ref_book', '')}</p><p><b>나. 웹사이트/기사:</b> {ans.get('ref_web', '')}</p>"
-                                elif act == ACTIVITIES[7] and ans.get("is_custom_self_eval"):
-                                    html_content += f"<h3>▶ {act}</h3><table><tr><th>항목</th><th>내용</th></tr>"
-                                    for row in ans.get("df1", []): html_content += f"<tr><td><b>{row.get('항목','')}</b></td><td><pre>{row.get('내용','')}</pre></td></tr>"
-                                    html_content += "</table>"
-                                elif act == ACTIVITIES[8] and ans.get("is_custom_roadmap"):
-                                    html_content += f"<h3>▶ {act}</h3><h4>1. 꼬리에 꼬리를 무는 독서</h4><table><tr><th>구분</th><th>도서명 / 저자</th><th>선정 이유 (탐구 활동과의 연결고리)</th></tr>"
-                                    for row in ans.get("df1", []): html_content += f"<tr><td><b><pre>{row.get('구분','')}</pre></b></td><td>{row.get('도서명 / 저자','')}</td><td>{row.get('선정 이유 (탐구 활동과의 연결고리)','')}</td></tr>"
-                                    html_content += "</table><h4>2. 나만의 3개년 실천 로드맵</h4><table><tr><th>시기</th><th>중점 목표</th><th>주요 활동 계획</th></tr>"
-                                    for row in ans.get("df2", []): html_content += f"<tr><td><b><pre>{row.get('시기','')}</pre></b></td><td><pre>{row.get('중점 목표','')}</pre></td><td><pre>{row.get('주요 활동 계획 (주제탐구, 독서, 실험 등)','')}</pre></td></tr>"
-                                    html_content += "</table>"
-                                else:
-                                    ans_content = ans.get("content", {})
-                                    if isinstance(ans_content, str): ans_content = {"text": ans_content}
-                                    if ans_content.get("text") or ans_content.get("link"):
-                                        html_content += f"<h3>▶ {act}</h3>"
-                                        if ans_content.get("text"): html_content += f"<b>[텍스트 작성 내용]</b><div class='content-box'>{ans_content['text']}</div>"
-                                        if ans_content.get("link"): html_content += f"<b>[제출 링크]</b> <a href='{ans_content['link']}' target='_blank' class='link-text'>{ans_content['link']}</a><br><br>"
-
-                            html_content += "<h2>📝 [2] 차시별 제출 자료</h2>"
-                            for t_name in app_config["tabs"]:
-                                for q in app_config["questions"].get(t_name, []):
-                                    ans = student_answers.get(t_name, {}).get(q["id"], {})
-                                    if isinstance(ans, str): ans = {"text": ans} 
-                                    if ans.get("text"):
-                                        html_content += f"<h3>▶ [{t_name}] {q.get('label', '')}</h3>"
-                                        html_content += f"<div class='content-box'>{ans['text']}</div>"
-
-                            html_content += "</body></html>"
-                            st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')}의 포트폴리오 다운로드 (웹문서/PDF 변환용)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.html", mime="text/html", type="primary")
+                            st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')} 포트폴리오 일괄 다운로드 (웹문서)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_학습포트폴리오.html", mime="text/html", type="primary")
                             
                             st.markdown("---")
+                            st.markdown(f"### 👀 <span style='color:#0056b3'>{all_users[selected_student].get('name', '학생')}</span> 학생의 실시간 활동 내역", unsafe_allow_html=True)
+                            
                             st.markdown("#### 📍 [1] 활동지 작성 내역")
                             for act in ACTIVITIES:
                                 ans = student_answers.get(act, {})
@@ -1057,10 +1160,10 @@ else:
                                     st.markdown(f"### **{act}**"); st.markdown("#### 1. 기본 정보")
                                     info_df = pd.DataFrame([{"항목": "교과명(강의명)", "내용": ans.get("info_course", ""), "항목2": "탐구 기간", "내용2": ans.get("info_date", "")}, {"항목": "소속학교", "내용": ans.get("info_school", ""), "항목2": "진로 희망", "내용2": ans.get("info_career", "")}, {"항목": "학번/이름", "내용": ans.get("info_name", ""), "항목2": "관련 교과, 단원", "내용2": ans.get("info_subject", "")}, {"항목": "탐구 방법", "내용": ans.get("info_method", ""), "항목2": "탐구 주제", "내용2": ans.get("info_topic", "")}])
                                     st.dataframe(info_df, hide_index=True, use_container_width=True); st.markdown("#### 2. 탐구 개요")
-                                    st.write(f"**가. 탐구 주제:** {ans.get('topic_title', '')}"); st.write("**나. 탐구 동기 및 배경**"); st.write(f"1) 교과 연계 동기: {ans.get('motive_1', '')}\n2) 선정 배경: {ans.get('motive_2', '')}\n3) 탐구 목적: {ans.get('purpose', '')}"); st.write("4) 이론적 배경:")
+                                    st.write(f"**가. 탐구 주제:** {ans.get('topic_title', '')}"); st.write(f"**나. 탐구 동기 및 배경**"); st.write(f"1) 교과 연계 동기: {ans.get('motive_1', '')}\n2) 선정 배경: {ans.get('motive_2', '')}\n3) 탐구 목적: {ans.get('purpose', '')}"); st.write("4) 이론적 배경:")
                                     st.dataframe(pd.DataFrame(ans.get("bg_df", [])), hide_index=True, use_container_width=True); st.markdown("#### 3. 탐구 설계 및 내용")
-                                    st.write(f"**가. 탐구 방법:** {', '.join(ans.get('selected_methods', []))}"); st.write("**나. 세부 절차:**")
-                                    st.dataframe(pd.DataFrame(ans.get("proc_df", [])), hide_index=True, use_container_width=True); st.write("**다. 탐구 내용 (본론):**"); st.info(ans.get("content_body", ""))
+                                    st.write(f"**가. 탐구 방법:** {', '.join(ans.get('selected_methods', []))}"); st.write(f"**나. 세부 절차:**")
+                                    st.dataframe(pd.DataFrame(ans.get("proc_df", [])), hide_index=True, use_container_width=True); st.write(f"**다. 탐구 내용 (본론):**"); st.info(ans.get("content_body", ""))
                                     st.write(f"**라. 탐구 결과**\n1) 결과 요약: {ans.get('result_summary', '')}\n2) 해석 및 의의: {ans.get('result_meaning', '')}"); st.markdown("#### 4. 결론 및 제언")
                                     st.write(f"**가. 결론:** {ans.get('conclusion', '')}"); st.write(f"**나. 성찰**\n1) 배우고 느낀 점: {ans.get('reflection_1', '')}\n2) 한계점: {ans.get('reflection_2', '')}"); st.write(f"**다. 후속 활동:** {ans.get('next_step', '')}")
                                     st.markdown("#### 5. 참고 문헌"); st.write(f"**가. 논문/도서:** {ans.get('ref_book', '')}\n**나. 웹사이트/기사:** {ans.get('ref_web', '')}"); st.markdown("<br>", unsafe_allow_html=True)
@@ -1072,12 +1175,10 @@ else:
                                 else:
                                     ans_content = ans.get("content", {})
                                     if isinstance(ans_content, str): ans_content = {"text": ans_content}
-                                    if ans_content.get("text") or ans_content.get("link") or ans_content.get("file_name"):
+                                    if ans_content.get("text") or ans_content.get("link"):
                                         st.markdown(f"**{act}**")
                                         if ans_content.get("text"): st.write(f"📝 {ans_content['text']}")
                                         if ans_content.get("link"): st.write(f"🔗 {ans_content['link']}")
-                                        if ans_content.get("file_path") and os.path.exists(ans_content['file_path']):
-                                            with open(ans_content['file_path'], "rb") as f: st.download_button("📥 첨부파일 다운로드", f, file_name=ans_content['file_name'], key=f"dl_{selected_student}_{act}")
                             
                             st.markdown("---")
                             st.markdown("#### 📍 [2] 차시별 제출 자료")
@@ -1210,6 +1311,7 @@ else:
                                 ans = learning_data.get(s_uid, {}).get(selected_view, {})
                                 u_info = all_users[s_uid]
                                 st.markdown(f"#### 👤 [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})")
+                                
                                 info_df = pd.DataFrame([
                                     {"항목": "교과명(강의명)", "내용": ans.get("info_course", ""), "항목2": "탐구 기간", "내용2": ans.get("info_date", "")},
                                     {"항목": "소속학교", "내용": ans.get("info_school", ""), "항목2": "진로 희망", "내용2": ans.get("info_career", "")},
@@ -1217,8 +1319,26 @@ else:
                                     {"항목": "탐구 방법", "내용": ans.get("info_method", ""), "항목2": "탐구 주제", "내용2": ans.get("info_topic", "")}
                                 ])
                                 st.dataframe(info_df, hide_index=True, use_container_width=True)
+                                
                                 st.write(f"**가. 탐구 주제:** {ans.get('topic_title', '')}")
-                                st.write("**나. 탐구 동기 등 세부 내용은 엑셀 파일에서 한눈에 확인 가능합니다.**")
+                                st.write(f"**나. 탐구 동기 및 배경**")
+                                st.write(f"1) 교과 연계 동기: {ans.get('motive_1', '')}")
+                                st.write(f"2) 선정 배경: {ans.get('motive_2', '')}")
+                                st.write(f"3) 탐구 목적: {ans.get('purpose', '')}")
+                                st.write(f"4) 이론적 배경:")
+                                st.dataframe(pd.DataFrame(ans.get("bg_df", [])), hide_index=True, use_container_width=True)
+                                
+                                st.write(f"**가. 탐구 방법:** {', '.join(ans.get('selected_methods', []))}")
+                                st.write(f"**나. 세부 절차:**")
+                                st.dataframe(pd.DataFrame(ans.get("proc_df", [])), hide_index=True, use_container_width=True)
+                                st.write(f"**다. 탐구 내용 (본론):**")
+                                st.info(ans.get("content_body", ""))
+                                
+                                st.write(f"**라. 탐구 결과**\n1) 결과 요약: {ans.get('result_summary', '')}\n2) 해석 및 의의: {ans.get('result_meaning', '')}")
+                                st.write(f"**가. 결론:** {ans.get('conclusion', '')}")
+                                st.write(f"**나. 성찰**\n1) 배우고 느낀 점: {ans.get('reflection_1', '')}\n2) 한계점: {ans.get('reflection_2', '')}")
+                                st.write(f"**다. 후속 활동:** {ans.get('next_step', '')}")
+                                st.write(f"**가. 논문/도서:** {ans.get('ref_book', '')}\n**나. 웹사이트/기사:** {ans.get('ref_web', '')}")
                                 st.markdown("---")
                                 
                                 csv_data.append([f"■ [{u_info.get('school', '')}] {u_info.get('class_group', '')} - {u_info.get('name', '')} ({u_info.get('id', s_uid.split('_')[-1])})", "", "", ""])
