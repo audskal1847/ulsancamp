@@ -44,12 +44,13 @@ INFO_BOX = "<div style='background-color: #f0f4f8; padding: 15px; border-radius:
 
 db_lock = threading.Lock()
 
-def show_success_message():
+# 💡 [요청 반영] 상황에 맞는 메시지를 출력할 수 있도록 업그레이드된 완료 메시지 함수
+def show_success_message(title="🎉 화면 저장이 완료되었습니다!", desc="입력하신 내용이 데이터베이스에 안전하게 저장되었습니다."):
     st.balloons()
-    st.markdown("""
+    st.markdown(f"""
     <div style='background-color: #e8f5e9; border: 2px solid #4caf50; padding: 20px; border-radius: 10px; text-align: center; margin-top: 20px; margin-bottom: 20px;'>
-        <h2 style='color: #2e7d32; margin-top: 0; margin-bottom: 10px;'>🎉 화면 저장이 완료되었습니다!</h2>
-        <p style='color: #1b5e20; font-size: 16px; font-weight: bold; margin-bottom: 0;'>입력하신 내용이 데이터베이스에 안전하게 저장되었습니다.</p>
+        <h2 style='color: #2e7d32; margin-top: 0; margin-bottom: 10px;'>{title}</h2>
+        <p style='color: #1b5e20; font-size: 16px; font-weight: bold; margin-bottom: 0;'>{desc}</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -120,7 +121,6 @@ def init_system():
             ]
             needs_update = True
 
-        # 💡 [핵심 반영 1] 동적 캠프 일정 데이터 초기화 세팅
         if "schedule_title" not in current_config:
             current_config["schedule_title"] = "🗓️ 7/23(목) ~ 7/24(금) 일정"
             needs_update = True
@@ -140,7 +140,6 @@ def init_system():
             ]
             needs_update = True
             
-        # 💡 [핵심 반영 2] 동적 커스텀 텍스트 블록 데이터 초기화 세팅
         if "custom_blocks" not in current_config:
             current_config["custom_blocks"] = []
             needs_update = True
@@ -585,7 +584,6 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
     st.header(f"🎯 [거점: {current_hub}] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
     
-    # 💡 [핵심 반영 1] 동적으로 설정된 캠프 일정표 제목 및 테이블 렌더링
     st.subheader(app_config.get("schedule_title", "🗓️ 7/23(목) ~ 7/24(금) 일정"))
     st.dataframe(pd.DataFrame(app_config.get("schedule_data", []), columns=["일자", "차시(시간)", "수업내용", "활동내용"]), use_container_width=True, hide_index=True)
     st.markdown("---")
@@ -632,7 +630,6 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
                     if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
         col_idx += 1
         
-    # 💡 [핵심 반영 2] 관리자가 마음대로 추가한 공지/안내 텍스트 블록 렌더링
     custom_blocks = app_config.get("custom_blocks", [])
     for block in custom_blocks:
         with cols[col_idx % 2]:
@@ -970,10 +967,9 @@ else:
                             for q_id, text_val in ans_dict.items():
                                 fresh_data[current_user_key][tab_name][q_id] = {"text": text_val, "link": "", "file_name": "", "file_path": ""}
                             save_json(DATA_FILE, fresh_data)
-                        show_success_message()
+                        show_success_message("🎉 텍스트가 저장되었습니다!", "입력하신 내용이 성공적으로 기록되었습니다.")
 
         elif current_role in ["교사", "관리자"]:
-            # 💡 기존 탭 제목 변경: '차시 및 자료 편집' -> '메인 화면 및 일정 편집'
             st.title(f"🛠️ {current_role} 대시보드 ({current_hub})")
             if current_role == "관리자": menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 메인 화면 및 일정 편집", "📥 학생 제출 자료 조회 및 관리"])
             else: menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "📥 학생 제출 자료 조회 및 관리"])
@@ -1000,7 +996,8 @@ else:
                                     if approve_target in fresh_users:
                                         fresh_users[approve_target]["approved"] = True
                                         save_json(USERS_FILE, fresh_users)
-                                st.success("승인 완료!"); st.rerun()
+                                st.session_state.msg_user_appr = True
+                                st.rerun()
                     with col_app2:
                         if st.button("✅ 대기 중인 모든 회원 일괄 승인", type="primary"):
                             with db_lock:
@@ -1009,7 +1006,14 @@ else:
                                     if uid in fresh_users:
                                         fresh_users[uid]["approved"] = True
                                 save_json(USERS_FILE, fresh_users)
-                            st.success("일괄 승인 완료!"); st.rerun()
+                            st.session_state.msg_user_appr_all = True
+                            st.rerun()
+                            
+                    # 💡 [요청 반영] 시각적 알림 메시지 (회원 승인)
+                    if st.session_state.get("msg_user_appr") or st.session_state.get("msg_user_appr_all"):
+                        show_success_message("🎉 승인이 완료되었습니다!", "가입 승인이 성공적으로 처리되었습니다.")
+                        st.session_state.msg_user_appr = False
+                        st.session_state.msg_user_appr_all = False
                 else: st.info("가입 승인을 대기 중인 회원이 없습니다.")
 
                 st.markdown("---")
@@ -1036,7 +1040,9 @@ else:
                                     if delete_target in fresh_users:
                                         del fresh_users[delete_target]
                                         save_json(USERS_FILE, fresh_users)
-                                st.success("삭제 완료"); st.rerun()
+                                st.session_state.msg_user_del = True
+                                st.rerun()
+                                
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
                         pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
@@ -1048,11 +1054,19 @@ else:
                                     if pw_target in fresh_users:
                                         fresh_users[pw_target]["password"] = new_pw
                                         save_json(USERS_FILE, fresh_users)
-                                st.success("비밀번호 성공적으로 변경"); st.rerun()
+                                st.session_state.msg_pw_change = True
+                                st.rerun()
+
+                    # 💡 [요청 반영] 시각적 알림 메시지 (회원 관리)
+                    if st.session_state.get("msg_user_del"):
+                        show_success_message("🎉 삭제가 완료되었습니다!", "선택한 회원이 시스템에서 완전히 삭제되었습니다.")
+                        st.session_state.msg_user_del = False
+                    if st.session_state.get("msg_pw_change"):
+                        show_success_message("🎉 비밀번호 변경 완료!", "선택한 회원의 비밀번호가 성공적으로 변경되었습니다.")
+                        st.session_state.msg_pw_change = False
 
             if current_role == "관리자":
                 with menu_tabs[2]:
-                    # 💡 [핵심 추가 1] 캠프 일정 동적 관리 편집창
                     st.subheader("📅 캠프 일정표 관리")
                     st.info("💡 학교마다 다른 캠프 일정을 여기에서 수정하면 학생 메인 화면의 표에 즉시 반영됩니다.")
                     
@@ -1066,11 +1080,15 @@ else:
                             fresh_config["schedule_title"] = new_sch_title
                             fresh_config["schedule_data"] = edited_sch_df.to_dict('records')
                             save_json(CONFIG_FILE, fresh_config)
-                        st.success("새로운 일정이 학생 화면에 업데이트되었습니다!"); st.rerun()
+                        st.session_state.msg_schedule = True
+                        st.rerun()
+                        
+                    # 💡 [요청 반영] 시각적 알림 메시지 (일정표 저장)
+                    if st.session_state.get("msg_schedule"):
+                        show_success_message("🎉 일정표 저장이 완료되었습니다!", "새로운 캠프 일정이 학생들 화면에 즉각적으로 반영되었습니다.")
+                        st.session_state.msg_schedule = False
                     
                     st.markdown("---")
-                    
-                    # 💡 [핵심 추가 2] 메인 화면 자유 텍스트/공지 블록 관리 엔진
                     st.subheader("📝 자유 텍스트/공지 블록 추가 (메인 화면)")
                     st.info("💡 링크 외에도 안내문, 팁, 텍스트 등 원하는 내용을 박스 형태로 메인 화면에 자유롭게 추가할 수 있습니다.")
                     
@@ -1088,10 +1106,16 @@ else:
                                         if "custom_blocks" not in fresh_config: fresh_config["custom_blocks"] = []
                                         fresh_config["custom_blocks"].append(new_block)
                                         save_json(CONFIG_FILE, fresh_config)
-                                    st.success("블록이 추가되었습니다!"); st.rerun()
+                                    st.session_state.msg_add_block = True
+                                    st.rerun()
                                 else:
                                     st.warning("제목과 내용을 모두 입력해주세요.")
                     
+                        # 💡 [요청 반영] 시각적 알림 메시지 (블록 추가)
+                        if st.session_state.get("msg_add_block"):
+                            show_success_message("🎉 블록 생성이 완료되었습니다!", "입력하신 공지 블록이 메인 화면에 성공적으로 추가되었습니다.")
+                            st.session_state.msg_add_block = False
+
                     with col_cb2:
                         st.write("❌ **기존 블록 삭제**")
                         current_blocks = app_config.get("custom_blocks", [])
@@ -1102,12 +1126,17 @@ else:
                                     fresh_config = load_json(CONFIG_FILE, {})
                                     fresh_config["custom_blocks"] = [b for b in fresh_config.get("custom_blocks", []) if b["id"] != del_cb_target["id"]]
                                     save_json(CONFIG_FILE, fresh_config)
-                                st.success("삭제 완료!"); st.rerun()
+                                st.session_state.msg_del_block = True
+                                st.rerun()
                         else:
                             st.info("현재 등록된 커스텀 블록이 없습니다.")
-                    
+                            
+                        # 💡 [요청 반영] 시각적 알림 메시지 (블록 삭제)
+                        if st.session_state.get("msg_del_block"):
+                            show_success_message("🎉 블록 삭제가 완료되었습니다!", "선택하신 텍스트 블록이 메인 화면에서 지워졌습니다.")
+                            st.session_state.msg_del_block = False
+
                     st.markdown("---")
-                    
                     st.subheader("🔗 메인 화면 즐겨찾기/공지 링크 관리")
                     st.info("💡 아래에서 등록한 링크들은 메인 화면의 '캠프 사전 안내' 등과 같이 버튼 형태로 학생들에게 즉시 노출됩니다.")
                     
@@ -1141,10 +1170,16 @@ else:
                                         if "dynamic_links" not in fresh_config: fresh_config["dynamic_links"] = []
                                         fresh_config["dynamic_links"].append(new_link)
                                         save_json(CONFIG_FILE, fresh_config)
-                                    st.success("링크 추가 완료!"); st.rerun()
+                                    st.session_state.msg_add_link = True
+                                    st.rerun()
                                 else:
                                     st.warning("모든 칸을 입력해주세요.")
                                     
+                        # 💡 [요청 반영] 시각적 알림 메시지 (링크 추가)
+                        if st.session_state.get("msg_add_link"):
+                            show_success_message("🎉 링크 추가가 완료되었습니다!", "새로운 바로가기 링크가 학생들 화면에 배포되었습니다.")
+                            st.session_state.msg_add_link = False
+                            
                     with col_dl2:
                         st.write("❌ **기존 외부 링크 삭제**")
                         if current_dynamic_links:
@@ -1154,9 +1189,15 @@ else:
                                     fresh_config = load_json(CONFIG_FILE, {})
                                     fresh_config["dynamic_links"] = [l for l in fresh_config.get("dynamic_links", []) if l["id"] != del_dl_target["id"]]
                                     save_json(CONFIG_FILE, fresh_config)
-                                st.success("삭제 완료!"); st.rerun()
+                                st.session_state.msg_del_link = True
+                                st.rerun()
                         else:
                             st.info("등록된 링크가 없습니다.")
+                            
+                        # 💡 [요청 반영] 시각적 알림 메시지 (링크 삭제)
+                        if st.session_state.get("msg_del_link"):
+                            show_success_message("🎉 링크 삭제가 완료되었습니다!", "선택하신 링크가 메인 화면에서 지워졌습니다.")
+                            st.session_state.msg_del_link = False
                             
                     st.markdown("---")
                     st.subheader("👨‍🏫 교사용 특강 자료 업로드 (PPT, PDF, 외부 링크)")
@@ -1183,8 +1224,14 @@ else:
                                     if "materials" not in fresh_config: fresh_config["materials"] = []
                                     fresh_config["materials"].append(new_mat)
                                     save_json(CONFIG_FILE, fresh_config)
-                                st.success("등록 완료!"); st.rerun()
-                    
+                                st.session_state.msg_add_mat = True
+                                st.rerun()
+                                
+                    # 💡 [요청 반영] 시각적 알림 메시지 (자료 업로드)
+                    if st.session_state.get("msg_add_mat"):
+                        show_success_message("🎉 특강 자료 등록이 완료되었습니다!", "업로드하신 자료가 교사용 자료실에 안전하게 보관되었습니다.")
+                        st.session_state.msg_add_mat = False
+
                     current_materials = load_json(CONFIG_FILE, {}).get("materials", [])
                     if current_materials:
                         st.write("🗑️ **등록된 강의 자료 삭제**")
@@ -1195,8 +1242,14 @@ else:
                                 if "materials" in fresh_config and del_mat_target in fresh_config["materials"]:
                                     fresh_config["materials"].remove(del_mat_target)
                                     save_json(CONFIG_FILE, fresh_config)
-                            st.success("삭제 완료!"); st.rerun()
-                    
+                            st.session_state.msg_del_mat = True
+                            st.rerun()
+                            
+                    # 💡 [요청 반영] 시각적 알림 메시지 (자료 삭제)
+                    if st.session_state.get("msg_del_mat"):
+                        show_success_message("🎉 자료 삭제가 완료되었습니다!", "선택하신 특강 자료가 삭제되었습니다.")
+                        st.session_state.msg_del_mat = False
+
                     st.markdown("---")
                     st.subheader("⚙️ 차시(Tab) 동적 제어")
                     col1, col2 = st.columns(2)
@@ -1215,7 +1268,14 @@ else:
                                     if "questions" not in fresh_config: fresh_config["questions"] = {}
                                     fresh_config["questions"][new_tab_name] = []
                                     save_json(CONFIG_FILE, fresh_config)
-                            st.success(f"🎉 {new_tab_name} 개설 완료."); st.rerun()
+                            st.session_state.msg_add_tab = True
+                            st.rerun()
+                            
+                        # 💡 [요청 반영] 시각적 알림 메시지 (차시 추가)
+                        if st.session_state.get("msg_add_tab"):
+                            show_success_message("🎉 차시 개설이 완료되었습니다!", "새로운 학습 차시(탭)가 학생 화면에 열렸습니다.")
+                            st.session_state.msg_add_tab = False
+                            
                     with col2:
                         st.write("❌ **기존 학습 차시 폐쇄**")
                         del_tab_target = st.selectbox("삭제할 차시를 지정하세요", ["선택"] + app_config.get("tabs", []))
@@ -1228,8 +1288,14 @@ else:
                                         fresh_config["pdfs"].pop(del_tab_target, None)
                                         fresh_config["questions"].pop(del_tab_target, None)
                                         save_json(CONFIG_FILE, fresh_config)
-                                st.success(f"삭제 완료."); st.rerun()
+                                st.session_state.msg_del_tab = True
+                                st.rerun()
                                 
+                        # 💡 [요청 반영] 시각적 알림 메시지 (차시 삭제)
+                        if st.session_state.get("msg_del_tab"):
+                            show_success_message("🎉 차시 삭제가 완료되었습니다!", "선택하신 차시와 관련된 질문들이 삭제되었습니다.")
+                            st.session_state.msg_del_tab = False
+
                     st.markdown("---")
                     st.subheader("📝 차시별 제출 텍스트 상자(질문 문항) 동적 가변 설정")
                     target_q_tab = st.selectbox("문항을 편집할 차시 선택", app_config.get("tabs", []))
@@ -1246,7 +1312,14 @@ else:
                                     if target_q_tab in fresh_config.get("questions", {}):
                                         fresh_config["questions"][target_q_tab].append({"id": new_id, "label": add_q_label})
                                         save_json(CONFIG_FILE, fresh_config)
-                                st.success("문항 추가 완료."); st.rerun()
+                                st.session_state.msg_add_q = True
+                                st.rerun()
+                                
+                            # 💡 [요청 반영] 시각적 알림 메시지 (질문 추가)
+                            if st.session_state.get("msg_add_q"):
+                                show_success_message("🎉 질문이 추가되었습니다!", "학생들이 입력할 수 있는 새로운 텍스트 칸이 만들어졌습니다.")
+                                st.session_state.msg_add_q = False
+                                
                         with q_col2:
                             if current_qs:
                                 del_q_target = st.selectbox("삭제할 문항 고르기", options=current_qs, format_func=lambda x: x.get("label", ""))
@@ -1257,7 +1330,13 @@ else:
                                             current_list = fresh_config["questions"][target_q_tab]
                                             fresh_config["questions"][target_q_tab] = [q for q in current_list if q["id"] != del_q_target["id"]]
                                             save_json(CONFIG_FILE, fresh_config)
-                                    st.success("삭제 완료."); st.rerun()
+                                    st.session_state.msg_del_q = True
+                                    st.rerun()
+                                    
+                            # 💡 [요청 반영] 시각적 알림 메시지 (질문 삭제)
+                            if st.session_state.get("msg_del_q"):
+                                show_success_message("🎉 문항 삭제가 완료되었습니다!", "선택하신 텍스트 입력칸이 시스템에서 삭제되었습니다.")
+                                st.session_state.msg_del_q = False
 
             with menu_tabs[-1]:
                 col_title, col_btn = st.columns([8, 2])
@@ -1370,7 +1449,7 @@ else:
                                 else:
                                     ans_content = ans.get("content", {})
                                     if isinstance(ans_content, str): ans_content = {"text": ans_content}
-                                    if ans_content.get("text") or ans_content.get("link"):
+                                    if ans_content.get("text") or ans_content.get("link") or ans_content.get("file_name"):
                                         st.markdown(f"**{act}**")
                                         if ans_content.get("text"): st.write(f"📝 {ans_content['text']}")
                                         if ans_content.get("link"): st.write(f"🔗 {ans_content['link']}")
