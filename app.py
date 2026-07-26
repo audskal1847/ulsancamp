@@ -801,7 +801,7 @@ else:
         reg_hub = st.sidebar.selectbox("거점학교 선택", HUB_SCHOOLS)
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
         if reg_role == "학생": 
-            reg_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 무룡고등학교")
+            reg_school = st.sidebar.text_input("소속 학교(원적교)")
             reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
         else: 
             reg_school = "교사소속"; reg_class = "교사"
