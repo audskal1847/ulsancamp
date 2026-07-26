@@ -283,7 +283,7 @@ def render_activity1_form(user_key):
     st.markdown(INFO_BOX.format("내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?"), unsafe_allow_html=True)
     step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
-    if st.button("활동지 최종 제출 및 저장", key="submit_act1", type="primary"):
+    if st.button("활동지 제출 및 저장", key="submit_act1", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {}) 
             if user_key not in current_data: current_data[user_key] = {}
@@ -370,7 +370,7 @@ def render_activity2_form(user_key):
     with col6: step7_s3 = st.text_input("밝힐점", value=ans.get("step7_s3", ""), label_visibility="collapsed")
     with col7: st.write(")을(를) 밝히려 한다.")
 
-    if st.button("활동지 최종 제출 및 저장", key="submit_act2", type="primary"):
+    if st.button("활동지 제출 및 저장", key="submit_act2", type="primary"):
         with db_lock: 
             current_data = load_json(DATA_FILE, {}) 
             if user_key not in current_data: current_data[user_key] = {}
@@ -392,7 +392,7 @@ def render_feedback_form(user_key, category, rows):
     default_df = pd.DataFrame([{"구분": r, "피드백 내용 (구체적으로)": "", "보완 및 수정 계획": ""} for r in rows])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["구분"], key=f"df_{category}")
-    if st.button("활동지 최종 제출 및 저장", key=f"btn_{category}", type="primary"):
+    if st.button("활동지 제출 및 저장", key=f"btn_{category}", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -412,7 +412,7 @@ def render_activity4_form(user_key):
     default_df = pd.DataFrame([{"사이트명": "", "제목": "", "내용": "", "선정이유": ""} for _ in range(5)])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, num_rows="dynamic", hide_index=True, use_container_width=True, key=f"df_{category}")
-    if st.button("활동지 최종 제출 및 저장", key=f"btn_{category}", type="primary"):
+    if st.button("활동지 제출 및 저장", key=f"btn_{category}", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -486,7 +486,7 @@ def render_activity5_form(user_key):
     st.markdown("**나. 웹사이트/기사**")
     ref_web = st.text_area("웹사이트/기사", value=ans.get("ref_web", ""), placeholder="사이트명, 기사 제목, URL, 접속일자", label_visibility="collapsed")
 
-    if st.button("활동지 최종 제출 및 저장", key="btn_act5", type="primary"):
+    if st.button("활동지 제출 및 저장", key="btn_act5", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -514,7 +514,7 @@ def render_activity8_form(user_key):
     ])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["항목"], key=f"df_{category}")
-    if st.button("활동지 최종 제출 및 저장", key="btn_act8", type="primary"):
+    if st.button("활동지 제출 및 저장", key="btn_act8", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -548,7 +548,7 @@ def render_activity9_form(user_key):
     df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
     edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["시기", "중점 목표"], key="act9_df2")
 
-    if st.button("활동지 최종 제출 및 저장", key="btn_act9", type="primary"):
+    if st.button("활동지 제출 및 저장", key="btn_act9", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
