@@ -17,10 +17,10 @@ UPLOAD_DIR = "uploads"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-CLASS_GROUPS = ["1반", "2반", "3반", "4반", "5반", "6반"]
+# 💡 [요청 반영 2] 5반, 6반 삭제 후 1반~4반까지만 설정
+CLASS_GROUPS = ["1반", "2반", "3반", "4반"]
 HUB_SCHOOLS = ["호계고등학교", "함월고등학교", "성광여자고등학교"]
 
-# 💡 [이전 요청 반영] 5명의 통합 관리자 계정 
 ADMIN_ACCOUNTS = {
     "admin": {"pw": "admin00", "name": "정현경", "school": "울산여자고등학교"},
     "admin1": {"pw": "admin11", "name": "임종우", "school": "신선여자고등학교"},
@@ -99,7 +99,6 @@ def init_system():
         current_config = load_json(CONFIG_FILE, {})
         needs_update = False
         
-        # 💡 [이전 요청 반영] 1차시~8차시 빈 탭 기본 세팅 삭제 로직
         if "tabs" in current_config:
             filtered_tabs = [t for t in current_config["tabs"] if not (t.endswith("차시") and len(t) == 3)]
             if len(filtered_tabs) != len(current_config["tabs"]):
@@ -113,7 +112,6 @@ def init_system():
             current_config["materials"] = []
             needs_update = True
             
-        # 💡 [핵심 추가] 동적 링크 관리를 위한 기본 데이터베이스 구조 세팅 (없을 경우 기본값 세팅)
         if "dynamic_links" not in current_config:
             current_config["dynamic_links"] = [
                 {"id": "dl_1", "group": "👥 캠프 사전 안내", "title": "🔗 캠프 사전 안내 노션 사이트", "url": "https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11"},
@@ -283,7 +281,7 @@ def render_activity1_form(user_key):
     st.markdown(INFO_BOX.format("내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?"), unsafe_allow_html=True)
     step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
-    if st.button("활동지 제출 및 저장", key="submit_act1", type="primary"):
+    if st.button("활동지 최종 제출 및 저장", key="submit_act1", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {}) 
             if user_key not in current_data: current_data[user_key] = {}
@@ -370,7 +368,7 @@ def render_activity2_form(user_key):
     with col6: step7_s3 = st.text_input("밝힐점", value=ans.get("step7_s3", ""), label_visibility="collapsed")
     with col7: st.write(")을(를) 밝히려 한다.")
 
-    if st.button("활동지 제출 및 저장", key="submit_act2", type="primary"):
+    if st.button("활동지 최종 제출 및 저장", key="submit_act2", type="primary"):
         with db_lock: 
             current_data = load_json(DATA_FILE, {}) 
             if user_key not in current_data: current_data[user_key] = {}
@@ -392,7 +390,7 @@ def render_feedback_form(user_key, category, rows):
     default_df = pd.DataFrame([{"구분": r, "피드백 내용 (구체적으로)": "", "보완 및 수정 계획": ""} for r in rows])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["구분"], key=f"df_{category}")
-    if st.button("활동지 제출 및 저장", key=f"btn_{category}", type="primary"):
+    if st.button("활동지 최종 제출 및 저장", key=f"btn_{category}", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -412,7 +410,7 @@ def render_activity4_form(user_key):
     default_df = pd.DataFrame([{"사이트명": "", "제목": "", "내용": "", "선정이유": ""} for _ in range(5)])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, num_rows="dynamic", hide_index=True, use_container_width=True, key=f"df_{category}")
-    if st.button("활동지 제출 및 저장", key=f"btn_{category}", type="primary"):
+    if st.button("활동지 최종 제출 및 저장", key=f"btn_{category}", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -486,7 +484,7 @@ def render_activity5_form(user_key):
     st.markdown("**나. 웹사이트/기사**")
     ref_web = st.text_area("웹사이트/기사", value=ans.get("ref_web", ""), placeholder="사이트명, 기사 제목, URL, 접속일자", label_visibility="collapsed")
 
-    if st.button("활동지 제출 및 저장", key="btn_act5", type="primary"):
+    if st.button("활동지 최종 제출 및 저장", key="btn_act5", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -514,7 +512,7 @@ def render_activity8_form(user_key):
     ])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["항목"], key=f"df_{category}")
-    if st.button("활동지 제출 및 저장", key="btn_act8", type="primary"):
+    if st.button("활동지 최종 제출 및 저장", key="btn_act8", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -548,7 +546,7 @@ def render_activity9_form(user_key):
     df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
     edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["시기", "중점 목표"], key="act9_df2")
 
-    if st.button("활동지 제출 및 저장", key="btn_act9", type="primary"):
+    if st.button("활동지 최종 제출 및 저장", key="btn_act9", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -557,7 +555,6 @@ def render_activity9_form(user_key):
         show_success_message()
     render_download_button(user_key, category)
 
-# --- 💡 [요청 반영] 캠프 종합 공지 (동적 링크 포함) 렌더링 ---
 def render_camp_overview(current_role, current_hub, current_user_key=None):
     st.header(f"🎯 [거점: {current_hub}] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
@@ -592,7 +589,6 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
 
     link_style = "font-size: 18px; font-weight: bold; color: #0056b3; text-decoration: none; display: block; margin-bottom: 10px;"
     
-    # 💡 동적 링크 데이터 로드
     dynamic_links = app_config.get("dynamic_links", [])
     grouped_links = {}
     for link in dynamic_links:
@@ -600,7 +596,6 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
 
     col1, col2 = st.columns(2)
     
-    # [좌측 영역]: 활동지 링크 고정 렌더링
     with col1:
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
@@ -608,8 +603,7 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
                 if st.button(f"📄 {act}", use_container_width=True):
                     st.session_state.current_page = act; st.rerun()
 
-    # [좌측 및 우측 영역]: 사용자가 등록한 동적 링크 그룹을 번갈아가며 렌더링
-    col_idx = 1 # 활동지가 들어간 col1과 밸런스를 맞추기 위해 첫 동적 그룹은 col2부터 시작
+    col_idx = 1 
     cols = [col1, col2]
     
     for group_name, links in grouped_links.items():
@@ -618,13 +612,11 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
                 for link in links:
                     st.markdown(f"<a href='{link['url']}' target='_blank' style='{link_style}'>{link['title']}</a>", unsafe_allow_html=True)
                 
-                # '만족도 조사' 그룹일 경우 QR코드 이미지 예외 처리 출력
                 if "만족도 조사" in group_name:
                     qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
                     if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
         col_idx += 1
             
-    # 💡 [요청 반영 3] 학생일 경우, 동적 링크들이 모두 그려진 뒤 그 아래에 다운로드 버튼 배치
     if current_role == "학생" and current_user_key:
         st.markdown("<br>", unsafe_allow_html=True)
         st.info("💡 **AI 도구(Gemini 등) 활용 팁:** 아래 버튼을 눌러 나의 전체 활동 내역을 다운로드한 뒤, AI 채팅창에 파일을 끌어다 넣고 **'이 내용을 바탕으로 발표 자료 목차를 짜줘'**라고 질문해 보세요!")
@@ -641,6 +633,7 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
+# 💡 [요청 반영 1] 탭 버튼의 글자 크기와 굵기를 20px, 900(Bold)로 대폭 상향하는 CSS
 st.markdown("""
 <style>
 [data-testid="stFormSubmitButton"] button, button[kind="primary"] {
@@ -694,6 +687,20 @@ button[kind="secondary"] p {
     color: #000000 !important;
     font-weight: 900 !important;
     font-size: 16px !important;
+}
+
+/* 탭 폰트 크기 및 굵기 대폭 상향 */
+button[data-baseweb="tab"] > div {
+    font-size: 20px !important;
+    font-weight: 900 !important;
+}
+button[data-baseweb="tab"] span {
+    font-size: 20px !important;
+    font-weight: 900 !important;
+}
+button[data-baseweb="tab"] p {
+    font-size: 20px !important;
+    font-weight: 900 !important;
 }
 
 [data-testid="stDataFrame"] {
@@ -1002,7 +1009,6 @@ else:
 
             if current_role == "관리자":
                 with menu_tabs[2]:
-                    # 💡 [요청 반영 4] 관리자가 동적으로 외부 링크를 관리할 수 있는 엔진 탑재
                     st.subheader("🔗 메인 화면 즐겨찾기/공지 링크 관리")
                     st.info("💡 아래에서 등록한 링크들은 메인 화면의 '캠프 사전 안내' 등과 같이 버튼 형태로 학생들에게 즉시 노출됩니다.")
                     
@@ -1084,7 +1090,7 @@ else:
                     if current_materials:
                         st.write("🗑️ **등록된 강의 자료 삭제**")
                         del_mat_target = st.selectbox("삭제할 자료를 선택하세요", options=current_materials, format_func=lambda x: x.get("title", "제목없음"))
-                        if st.button("선택한 강의 자료 삭제하기", type="primary"):
+                        if st.button("선택한 자료 삭제하기", type="primary"):
                             with db_lock:
                                 fresh_config = load_json(CONFIG_FILE, {})
                                 if "materials" in fresh_config and del_mat_target in fresh_config["materials"]:
