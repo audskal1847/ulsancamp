@@ -120,6 +120,31 @@ def init_system():
             ]
             needs_update = True
 
+        # 💡 [핵심 반영 1] 동적 캠프 일정 데이터 초기화 세팅
+        if "schedule_title" not in current_config:
+            current_config["schedule_title"] = "🗓️ 7/23(목) ~ 7/24(금) 일정"
+            needs_update = True
+            
+        if "schedule_data" not in current_config:
+            current_config["schedule_data"] = [
+                {"일자": "1일차", "차시(시간)": "1 (09:00~10:40)", "수업내용": "학생부 종합 전형과 탐구 역량의 이해", "활동내용": "우수 기록 사례 분석 및 인공지능 탐색 툴 활용법 익히기"},
+                {"일자": "1일차", "차시(시간)": "2 (11:00~12:40)", "수업내용": "학과 안내서(가이드북)를 활용한 나의 학생부 분석", "활동내용": "학과별 요구 역량 파악 및 개인별 학생부 강점·보완점 분석 활동"},
+                {"일자": "1일차", "차시(시간)": "점심 (12:40~13:30)", "수업내용": "점심식사", "활동내용": "점심식사"},
+                {"일자": "1일차", "차시(시간)": "3 (13:30~15:10)", "수업내용": "탐구 주제 선정 및 보고서 개요(목차) 작성법", "활동내용": "인공지능을 활용한 개인별 맞춤형 탐구 주제 및 목차 설계"},
+                {"일자": "1일차", "차시(시간)": "4 (15:30~17:10)", "수업내용": "탐구 보고서 설계도 작성 및 자료 수집", "활동내용": "논문, 해외 원문, 도서, 기사 등 다각적 자료 수집 및 개요 구체화"},
+                {"일자": "2일차", "차시(시간)": "1 (09:00~10:40)", "수업내용": "탐구 보고서 본문 작성 및 내용 보완", "활동내용": "수집한 자료를 바탕으로 보고서 초안 작성 및 자체 점검"},
+                {"일자": "2일차", "차시(시간)": "2 (11:00~12:40)", "수업내용": "탐구 결과 요약 및 시각화 자료 구성", "활동내용": "보고서 핵심 내용 요약 및 인포그래픽, 시각 자료 제작 활동"},
+                {"일자": "2일차", "차시(시간)": "점심 (12:40~13:30)", "수업내용": "점심식사", "활동내용": "점심식사"},
+                {"일자": "2일차", "차시(시간)": "3 (13:30~15:10)", "수업내용": "탐구 보고서 최종 수정 및 고도화", "활동내용": "작성된 보고서의 논리 구조 점검 및 문장 다듬기 완성 활동"},
+                {"일자": "2일차", "차시(시간)": "4 (15:30~17:10)", "수업내용": "후속 탐구 활동 계획 및 학년별 실천 로드맵 수립", "활동내용": "연계 독서 활동 계획 수립 및 교과 학습 실천 로드맵 정리"}
+            ]
+            needs_update = True
+            
+        # 💡 [핵심 반영 2] 동적 커스텀 텍스트 블록 데이터 초기화 세팅
+        if "custom_blocks" not in current_config:
+            current_config["custom_blocks"] = []
+            needs_update = True
+
         if needs_update: save_json(CONFIG_FILE, current_config)
 
 def display_pdf(file_path):
@@ -555,25 +580,16 @@ def render_activity9_form(user_key):
     render_download_button(user_key, category)
 
 def render_camp_overview(current_role, current_hub, current_user_key=None):
+    app_config = load_json(CONFIG_FILE, {})
+    
     st.header(f"🎯 [거점: {current_hub}] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
-    st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
-    schedule_data = [
-        ["1일차", "1 (09:00~10:40)", "학생부 종합 전형과 탐구 역량의 이해", "우수 기록 사례 분석 및 인공지능 탐색 툴 활용법 익히기"],
-        ["1일차", "2 (11:00~12:40)", "학과 안내서(가이드북)를 활용한 나의 학생부 분석", "학과별 요구 역량 파악 및 개인별 학생부 강점·보완점 분석 활동"],
-        ["1일차", "점심 (12:40~13:30)", "점심식사", "점심식사"],
-        ["1일차", "3 (13:30~15:10)", "탐구 주제 선정 및 보고서 개요(목차) 작성법", "인공지능을 활용한 개인별 맞춤형 탐구 주제 및 목차 설계"],
-        ["1일차", "4 (15:30~17:10)", "탐구 보고서 설계도 작성 및 자료 수집", "논문, 해외 원문, 도서, 기사 등 다각적 자료 수집 및 개요 구체화"],
-        ["2일차", "1 (09:00~10:40)", "탐구 보고서 본문 작성 및 내용 보완", "수집한 자료를 바탕으로 보고서 초안 작성 및 자체 점검"],
-        ["2일차", "2 (11:00~12:40)", "탐구 결과 요약 및 시각화 자료 구성", "보고서 핵심 내용 요약 및 인포그래픽, 시각 자료 제작 활동"],
-        ["2일차", "점심 (12:40~13:30)", "점심식사", "점심식사"],
-        ["2일차", "3 (13:30~15:10)", "탐구 보고서 최종 수정 및 고도화", "작성된 보고서의 논리 구조 점검 및 문장 다듬기 완성 활동"],
-        ["2일차", "4 (15:30~17:10)", "후속 탐구 활동 계획 및 학년별 실천 로드맵 수립", "연계 독서 활동 계획 수립 및 교과 학습 실천 로드맵 정리"]
-    ]
-    st.dataframe(pd.DataFrame(schedule_data, columns=["일자", "차시(시간)", "수업내용", "활동내용"]), use_container_width=True, hide_index=True)
+    
+    # 💡 [핵심 반영 1] 동적으로 설정된 캠프 일정표 제목 및 테이블 렌더링
+    st.subheader(app_config.get("schedule_title", "🗓️ 7/23(목) ~ 7/24(금) 일정"))
+    st.dataframe(pd.DataFrame(app_config.get("schedule_data", []), columns=["일자", "차시(시간)", "수업내용", "활동내용"]), use_container_width=True, hide_index=True)
     st.markdown("---")
     
-    app_config = load_json(CONFIG_FILE, {})
     materials = app_config.get("materials", [])
     if materials:
         st.subheader("👨‍🏫 캠프 특강 및 강의 자료실")
@@ -614,6 +630,14 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
                 if "만족도 조사" in group_name:
                     qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
                     if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
+        col_idx += 1
+        
+    # 💡 [핵심 반영 2] 관리자가 마음대로 추가한 공지/안내 텍스트 블록 렌더링
+    custom_blocks = app_config.get("custom_blocks", [])
+    for block in custom_blocks:
+        with cols[col_idx % 2]:
+            with st.expander(block["title"], expanded=True):
+                st.markdown(block["content"])
         col_idx += 1
             
     if current_role == "학생" and current_user_key:
@@ -949,8 +973,9 @@ else:
                         show_success_message()
 
         elif current_role in ["교사", "관리자"]:
+            # 💡 기존 탭 제목 변경: '차시 및 자료 편집' -> '메인 화면 및 일정 편집'
             st.title(f"🛠️ {current_role} 대시보드 ({current_hub})")
-            if current_role == "관리자": menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 차시 및 자료 편집", "📥 학생 제출 자료 조회 및 관리"])
+            if current_role == "관리자": menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 메인 화면 및 일정 편집", "📥 학생 제출 자료 조회 및 관리"])
             else: menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "📥 학생 제출 자료 조회 및 관리"])
             
             with menu_tabs[0]: render_camp_overview(current_role, current_hub)
@@ -1027,6 +1052,62 @@ else:
 
             if current_role == "관리자":
                 with menu_tabs[2]:
+                    # 💡 [핵심 추가 1] 캠프 일정 동적 관리 편집창
+                    st.subheader("📅 캠프 일정표 관리")
+                    st.info("💡 학교마다 다른 캠프 일정을 여기에서 수정하면 학생 메인 화면의 표에 즉시 반영됩니다.")
+                    
+                    new_sch_title = st.text_input("일정표 제목 (예: 7/23(목) ~ 7/24(금) 일정)", value=app_config.get("schedule_title", "🗓️ 7/23(목) ~ 7/24(금) 일정"))
+                    sch_df = pd.DataFrame(app_config.get("schedule_data", []), columns=["일자", "차시(시간)", "수업내용", "활동내용"])
+                    edited_sch_df = st.data_editor(sch_df, num_rows="dynamic", use_container_width=True, key="schedule_editor")
+                    
+                    if st.button("일정표 저장 및 배포", type="primary"):
+                        with db_lock:
+                            fresh_config = load_json(CONFIG_FILE, {})
+                            fresh_config["schedule_title"] = new_sch_title
+                            fresh_config["schedule_data"] = edited_sch_df.to_dict('records')
+                            save_json(CONFIG_FILE, fresh_config)
+                        st.success("새로운 일정이 학생 화면에 업데이트되었습니다!"); st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    # 💡 [핵심 추가 2] 메인 화면 자유 텍스트/공지 블록 관리 엔진
+                    st.subheader("📝 자유 텍스트/공지 블록 추가 (메인 화면)")
+                    st.info("💡 링크 외에도 안내문, 팁, 텍스트 등 원하는 내용을 박스 형태로 메인 화면에 자유롭게 추가할 수 있습니다.")
+                    
+                    col_cb1, col_cb2 = st.columns(2)
+                    with col_cb1:
+                        st.write("➕ **새로운 블록 만들기**")
+                        with st.form("add_custom_block"):
+                            cb_title = st.text_input("블록 제목 (예: 📢 내일 캠프 준비물 안내)")
+                            cb_content = st.text_area("내용 입력 (엔터 및 줄바꿈 지원)")
+                            if st.form_submit_button("블록 생성하기", type="primary"):
+                                if cb_title and cb_content:
+                                    new_block = {"id": f"cb_{datetime.datetime.now().strftime('%d%H%M%S')}", "title": cb_title, "content": cb_content}
+                                    with db_lock:
+                                        fresh_config = load_json(CONFIG_FILE, {})
+                                        if "custom_blocks" not in fresh_config: fresh_config["custom_blocks"] = []
+                                        fresh_config["custom_blocks"].append(new_block)
+                                        save_json(CONFIG_FILE, fresh_config)
+                                    st.success("블록이 추가되었습니다!"); st.rerun()
+                                else:
+                                    st.warning("제목과 내용을 모두 입력해주세요.")
+                    
+                    with col_cb2:
+                        st.write("❌ **기존 블록 삭제**")
+                        current_blocks = app_config.get("custom_blocks", [])
+                        if current_blocks:
+                            del_cb_target = st.selectbox("삭제할 블록 선택", current_blocks, format_func=lambda x: x["title"])
+                            if st.button("선택한 블록 삭제하기", type="primary"):
+                                with db_lock:
+                                    fresh_config = load_json(CONFIG_FILE, {})
+                                    fresh_config["custom_blocks"] = [b for b in fresh_config.get("custom_blocks", []) if b["id"] != del_cb_target["id"]]
+                                    save_json(CONFIG_FILE, fresh_config)
+                                st.success("삭제 완료!"); st.rerun()
+                        else:
+                            st.info("현재 등록된 커스텀 블록이 없습니다.")
+                    
+                    st.markdown("---")
+                    
                     st.subheader("🔗 메인 화면 즐겨찾기/공지 링크 관리")
                     st.info("💡 아래에서 등록한 링크들은 메인 화면의 '캠프 사전 안내' 등과 같이 버튼 형태로 학생들에게 즉시 노출됩니다.")
                     
@@ -1189,7 +1270,6 @@ else:
                 all_users = load_json(USERS_FILE, {})
                 learning_data = load_json(DATA_FILE, {})
                 
-                # 💡 [요청 반영] 조회할 거점학교 선택 기능 추가
                 st.markdown("---")
                 st.markdown("#### 🏫 거점학교 및 학급 필터링")
                 col_filter1, col_filter2 = st.columns(2)
@@ -1290,7 +1370,7 @@ else:
                                 else:
                                     ans_content = ans.get("content", {})
                                     if isinstance(ans_content, str): ans_content = {"text": ans_content}
-                                    if ans_content.get("text") or ans_content.get("link") or ans_content.get("file_name"):
+                                    if ans_content.get("text") or ans_content.get("link"):
                                         st.markdown(f"**{act}**")
                                         if ans_content.get("text"): st.write(f"📝 {ans_content['text']}")
                                         if ans_content.get("link"): st.write(f"🔗 {ans_content['link']}")
