@@ -17,11 +17,16 @@ UPLOAD_DIR = "uploads"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-CLASS_GROUPS = ["1반", "2반", "3반", "4반", "5반", "6반"] # 필요에 따라 반 추가 가능
+CLASS_GROUPS = ["1반", "2반", "3반", "4반", "5반", "6반"]
 HUB_SCHOOLS = ["호계고등학교", "함월고등학교", "성광여자고등학교"]
 
+# 💡 [이전 요청 반영] 5명의 통합 관리자 계정 
 ADMIN_ACCOUNTS = {
-    "audskal": {"pw": "1847", "name": "김명남", "school": "신선여자고등학교"}
+    "admin": {"pw": "admin00", "name": "정현경", "school": "울산여자고등학교"},
+    "admin1": {"pw": "admin11", "name": "임종우", "school": "신선여자고등학교"},
+    "admin2": {"pw": "admin22", "name": "김명남", "school": "신선여자고등학교"},
+    "admin3": {"pw": "admin33", "name": "김민성", "school": "매곡고등학교"},
+    "admin4": {"pw": "admin44", "name": "이학승", "school": "함월고등학교"}
 }
 
 ACTIVITIES = [
@@ -91,31 +96,33 @@ def init_system():
                 users_changed = True
         if users_changed: save_json(USERS_FILE, users)
         
-        default_tabs = [f"{i}차시" for i in range(1, 9)]
-        default_pdfs = {f"{i}차시": f"session{i}.pdf" for i in range(1, 9)}
-        default_questions_template = [
-            {"id": "q1", "label": "1. 오늘 배운 핵심 내용을 요약해보세요."},
-            {"id": "q2", "label": "2. 이번 차시에서 가장 흥미로웠던 점은 무엇인가요?"},
-            {"id": "q3", "label": "3. 질문이나 더 알아보고 싶은 점을 적어주세요."}
-        ]
-        default_questions = {tab: default_questions_template.copy() for tab in default_tabs}
-        
         current_config = load_json(CONFIG_FILE, {})
         needs_update = False
-        if current_config.get("tabs") != default_tabs:
-            current_config["tabs"] = default_tabs
-            current_config["pdfs"] = default_pdfs
-            current_config["questions"] = default_questions
-            needs_update = True
+        
+        # 💡 [이전 요청 반영] 1차시~8차시 빈 탭 기본 세팅 삭제 로직
+        if "tabs" in current_config:
+            filtered_tabs = [t for t in current_config["tabs"] if not (t.endswith("차시") and len(t) == 3)]
+            if len(filtered_tabs) != len(current_config["tabs"]):
+                current_config["tabs"] = filtered_tabs
+                needs_update = True
         else:
-            for tab in default_tabs:
-                if len(current_config.get("questions", {}).get(tab, [])) != 3:
-                    if "questions" not in current_config: current_config["questions"] = {}
-                    current_config["questions"][tab] = default_questions_template.copy()
-                    needs_update = True
+            current_config["tabs"] = []
+            needs_update = True
+            
         if "materials" not in current_config:
             current_config["materials"] = []
             needs_update = True
+            
+        # 💡 [핵심 추가] 동적 링크 관리를 위한 기본 데이터베이스 구조 세팅 (없을 경우 기본값 세팅)
+        if "dynamic_links" not in current_config:
+            current_config["dynamic_links"] = [
+                {"id": "dl_1", "group": "👥 캠프 사전 안내", "title": "🔗 캠프 사전 안내 노션 사이트", "url": "https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11"},
+                {"id": "dl_2", "group": "👥 캠프 사전 안내", "title": "🔗 사전 설문조사 [구글 폼]", "url": "https://forms.gle/4Co5GLdD3M6KEVcs8"},
+                {"id": "dl_3", "group": "📚 대학 전공 가이드북 링크", "title": "📁 대학 전공 가이드북 구글 드라이브 폴더 열기", "url": "https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing"},
+                {"id": "dl_4", "group": "📊 만족도 조사 설문 링크 (QR 포함)", "title": "🔗 캠프 만족도 조사 참여하기 (Google Forms)", "url": "https://forms.gle/kqjWnsTE65Jf8QCS6"}
+            ]
+            needs_update = True
+
         if needs_update: save_json(CONFIG_FILE, current_config)
 
 def display_pdf(file_path):
@@ -550,8 +557,8 @@ def render_activity9_form(user_key):
         show_success_message()
     render_download_button(user_key, category)
 
-# --- 캠프 종합 공지 렌더링 ---
-def render_camp_overview(current_role, current_hub):
+# --- 💡 [요청 반영] 캠프 종합 공지 (동적 링크 포함) 렌더링 ---
+def render_camp_overview(current_role, current_hub, current_user_key=None):
     st.header(f"🎯 [거점: {current_hub}] 주제 탐구 캠프 (26-하계방학)")
     st.markdown("---")
     st.subheader("🗓️ 7/23(목) ~ 7/24(금) 일정")
@@ -584,21 +591,52 @@ def render_camp_overview(current_role, current_hub):
         st.markdown("---")
 
     link_style = "font-size: 18px; font-weight: bold; color: #0056b3; text-decoration: none; display: block; margin-bottom: 10px;"
+    
+    # 💡 동적 링크 데이터 로드
+    dynamic_links = app_config.get("dynamic_links", [])
+    grouped_links = {}
+    for link in dynamic_links:
+        grouped_links.setdefault(link['group'], []).append(link)
+
     col1, col2 = st.columns(2)
+    
+    # [좌측 영역]: 활동지 링크 고정 렌더링
     with col1:
-        with st.expander("👥 캠프 사전 안내", expanded=True):
-            st.markdown(f"<a href='https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11' target='_blank' style='{link_style}'>🔗 캠프 사전 안내 노션 사이트</a>", unsafe_allow_html=True)
-            st.markdown(f"<a href='https://forms.gle/4Co5GLdD3M6KEVcs8' target='_blank' style='{link_style}'>🔗 사전 설문조사 [구글 폼]</a>", unsafe_allow_html=True)
         with st.expander("📝 활동지 링크 (클릭 시 이동 및 작성)", expanded=True):
             st.caption("아래 버튼을 누르면 프로그램 내 제출 화면으로 전환됩니다.")
             for act in ACTIVITIES:
                 if st.button(f"📄 {act}", use_container_width=True):
                     st.session_state.current_page = act; st.rerun()
-    with col2:
-        with st.expander("📚 대학 전공 가이드북 링크", expanded=True):
-            st.markdown(f"<a href='https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing' target='_blank' style='{link_style}'>📁 대학 전공 가이드북 구글 드라이브 폴더 열기</a>", unsafe_allow_html=True)
-        with st.expander("📊 만족도 조사 설문 링크 (QR 포함)", expanded=True):
-            st.markdown(f"<a href='https://forms.gle/kqjWnsTE65Jf8QCS6' target='_blank' style='{link_style}'>🔗 캠프 만족도 조사 참여하기 (Google Forms)</a>", unsafe_allow_html=True)
+
+    # [좌측 및 우측 영역]: 사용자가 등록한 동적 링크 그룹을 번갈아가며 렌더링
+    col_idx = 1 # 활동지가 들어간 col1과 밸런스를 맞추기 위해 첫 동적 그룹은 col2부터 시작
+    cols = [col1, col2]
+    
+    for group_name, links in grouped_links.items():
+        with cols[col_idx % 2]:
+            with st.expander(group_name, expanded=True):
+                for link in links:
+                    st.markdown(f"<a href='{link['url']}' target='_blank' style='{link_style}'>{link['title']}</a>", unsafe_allow_html=True)
+                
+                # '만족도 조사' 그룹일 경우 QR코드 이미지 예외 처리 출력
+                if "만족도 조사" in group_name:
+                    qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
+                    if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
+        col_idx += 1
+            
+    # 💡 [요청 반영 3] 학생일 경우, 동적 링크들이 모두 그려진 뒤 그 아래에 다운로드 버튼 배치
+    if current_role == "학생" and current_user_key:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.info("💡 **AI 도구(Gemini 등) 활용 팁:** 아래 버튼을 눌러 나의 전체 활동 내역을 다운로드한 뒤, AI 채팅창에 파일을 끌어다 넣고 **'이 내용을 바탕으로 발표 자료 목차를 짜줘'**라고 질문해 보세요!")
+        current_data = load_json(DATA_FILE, {})
+        student_answers = current_data.get(current_user_key, {})
+        full_html = generate_html_report(st.session_state.user_info, student_answers, target_act=None, app_config=app_config)
+        st.download_button(label="📥 나의 전체 활동 포트폴리오 다운로드 (HTML)",
+                           data=full_html.encode('utf-8-sig'),
+                           file_name=f"{st.session_state.user_info['name']}_전체포트폴리오.html",
+                           mime="text/html",
+                           type="primary",
+                           use_container_width=True)
 
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
@@ -830,7 +868,6 @@ else:
         st.title(f"📄 {act_name}")
         st.markdown("---")
         
-        # 💡 [요청 반영] 교사(관리자)도 학생과 동일한 활동지 화면을 볼 수 있도록 개방
         if current_role == "학생":
             st.warning("🚨 [임시 데이터 저장 안내] 작성 중 화면 바깥을 클릭하면 임시로 남아있지만, 새로고침 시 날아갈 수 있습니다. 완전히 저장하려면 반드시 맨 아래의 **[제출 및 저장]** 버튼을 틈틈이 눌러주세요!")
         else:
@@ -853,22 +890,11 @@ else:
 
     elif st.session_state.current_page == "main":
         if current_role == "학생":
-            st.info("💡 **AI 도구(Gemini 등) 활용 팁:** 아래 버튼을 눌러 나의 전체 활동 내역을 다운로드한 뒤, AI 채팅창에 파일을 끌어다 넣고 **'이 내용을 바탕으로 발표 자료 목차를 짜줘'**라고 질문해 보세요!")
-            current_data = load_json(DATA_FILE, {})
-            student_answers = current_data.get(current_user_key, {})
-            full_html = generate_html_report(st.session_state.user_info, student_answers, target_act=None, app_config=app_config)
-            st.download_button(label="📥 나의 전체 활동 포트폴리오 다운로드 (HTML)",
-                               data=full_html.encode('utf-8-sig'),
-                               file_name=f"{st.session_state.user_info['name']}_전체포트폴리오.html",
-                               mime="text/html",
-                               type="primary",
-                               use_container_width=True)
-            st.markdown("---")
-
-            tabs_list = ["📌 캠프 공지 및 자료실"] + app_config["tabs"]
+            
+            tabs_list = ["📌 캠프 공지 및 자료실"] + app_config.get("tabs", [])
             tabs_objects = st.tabs(tabs_list)
-            with tabs_objects[0]: render_camp_overview(current_role, current_hub)
-            for index, tab_name in enumerate(app_config["tabs"]):
+            with tabs_objects[0]: render_camp_overview(current_role, current_hub, current_user_key)
+            for index, tab_name in enumerate(app_config.get("tabs", [])):
                 with tabs_objects[index + 1]:
                     st.subheader(f"📘 {tab_name} 활동 및 자료 제출")
                     display_pdf(app_config["pdfs"].get(tab_name, f"{tab_name}.pdf"))
@@ -976,6 +1002,58 @@ else:
 
             if current_role == "관리자":
                 with menu_tabs[2]:
+                    # 💡 [요청 반영 4] 관리자가 동적으로 외부 링크를 관리할 수 있는 엔진 탑재
+                    st.subheader("🔗 메인 화면 즐겨찾기/공지 링크 관리")
+                    st.info("💡 아래에서 등록한 링크들은 메인 화면의 '캠프 사전 안내' 등과 같이 버튼 형태로 학생들에게 즉시 노출됩니다.")
+                    
+                    current_dynamic_links = app_config.get("dynamic_links", [])
+                    
+                    col_dl1, col_dl2 = st.columns(2)
+                    with col_dl1:
+                        st.write("➕ **새로운 외부 링크 추가**")
+                        with st.form("add_dynamic_link"):
+                            existing_groups = list(dict.fromkeys([link["group"] for link in current_dynamic_links]))
+                            if not existing_groups: existing_groups = ["👥 캠프 사전 안내", "📚 참고 자료"]
+                            
+                            new_dl_group = st.selectbox("어느 그룹(박스)에 넣을까요?", existing_groups + ["(새로운 그룹 직접 입력)"])
+                            custom_dl_group = st.text_input("새로운 그룹 이름 (위에서 직접 입력을 선택한 경우)")
+                            
+                            final_dl_group = custom_dl_group if new_dl_group == "(새로운 그룹 직접 입력)" and custom_dl_group else new_dl_group
+                            
+                            new_dl_title = st.text_input("링크 제목 (예: 🔗 사전 설문조사 구글 폼)")
+                            new_dl_url = st.text_input("URL 주소 (https://...)")
+                            
+                            if st.form_submit_button("링크 추가하기", type="primary"):
+                                if final_dl_group and new_dl_title and new_dl_url:
+                                    new_link = {
+                                        "id": f"dl_{datetime.datetime.now().strftime('%d%H%M%S')}",
+                                        "group": final_dl_group,
+                                        "title": new_dl_title,
+                                        "url": new_dl_url
+                                    }
+                                    with db_lock:
+                                        fresh_config = load_json(CONFIG_FILE, {})
+                                        if "dynamic_links" not in fresh_config: fresh_config["dynamic_links"] = []
+                                        fresh_config["dynamic_links"].append(new_link)
+                                        save_json(CONFIG_FILE, fresh_config)
+                                    st.success("링크 추가 완료!"); st.rerun()
+                                else:
+                                    st.warning("모든 칸을 입력해주세요.")
+                                    
+                    with col_dl2:
+                        st.write("❌ **기존 외부 링크 삭제**")
+                        if current_dynamic_links:
+                            del_dl_target = st.selectbox("삭제할 링크를 선택하세요", current_dynamic_links, format_func=lambda x: f"[{x['group']}] {x['title']}")
+                            if st.button("선택한 링크 삭제하기", type="primary"):
+                                with db_lock:
+                                    fresh_config = load_json(CONFIG_FILE, {})
+                                    fresh_config["dynamic_links"] = [l for l in fresh_config.get("dynamic_links", []) if l["id"] != del_dl_target["id"]]
+                                    save_json(CONFIG_FILE, fresh_config)
+                                st.success("삭제 완료!"); st.rerun()
+                        else:
+                            st.info("등록된 링크가 없습니다.")
+                            
+                    st.markdown("---")
                     st.subheader("👨‍🏫 교사용 특강 자료 업로드 (PPT, PDF, 외부 링크)")
                     with st.form("upload_lecture_material"):
                         mat_title = st.text_input("자료 제목 (예: 1일차 오리엔테이션 PPT)")
@@ -1006,7 +1084,7 @@ else:
                     if current_materials:
                         st.write("🗑️ **등록된 강의 자료 삭제**")
                         del_mat_target = st.selectbox("삭제할 자료를 선택하세요", options=current_materials, format_func=lambda x: x.get("title", "제목없음"))
-                        if st.button("선택한 자료 삭제하기", type="primary"):
+                        if st.button("선택한 강의 자료 삭제하기", type="primary"):
                             with db_lock:
                                 fresh_config = load_json(CONFIG_FILE, {})
                                 if "materials" in fresh_config and del_mat_target in fresh_config["materials"]:
@@ -1024,20 +1102,23 @@ else:
                         if st.button("차시 개설하기", type="primary"):
                             with db_lock:
                                 fresh_config = load_json(CONFIG_FILE, {})
-                                if new_tab_name and new_tab_name not in fresh_config["tabs"]:
+                                if new_tab_name and new_tab_name not in fresh_config.get("tabs", []):
+                                    if "tabs" not in fresh_config: fresh_config["tabs"] = []
                                     fresh_config["tabs"].append(new_tab_name)
+                                    if "pdfs" not in fresh_config: fresh_config["pdfs"] = {}
                                     fresh_config["pdfs"][new_tab_name] = new_pdf_name
+                                    if "questions" not in fresh_config: fresh_config["questions"] = {}
                                     fresh_config["questions"][new_tab_name] = []
                                     save_json(CONFIG_FILE, fresh_config)
                             st.success(f"🎉 {new_tab_name} 개설 완료."); st.rerun()
                     with col2:
                         st.write("❌ **기존 학습 차시 폐쇄**")
-                        del_tab_target = st.selectbox("삭제할 차시를 지정하세요", ["선택"] + app_config["tabs"])
+                        del_tab_target = st.selectbox("삭제할 차시를 지정하세요", ["선택"] + app_config.get("tabs", []))
                         if del_tab_target != "선택":
                             if st.button(f"🔥 {del_tab_target} 세션 및 질문 전체 삭제", type="primary"):
                                 with db_lock:
                                     fresh_config = load_json(CONFIG_FILE, {})
-                                    if del_tab_target in fresh_config["tabs"]:
+                                    if del_tab_target in fresh_config.get("tabs", []):
                                         fresh_config["tabs"].remove(del_tab_target)
                                         fresh_config["pdfs"].pop(del_tab_target, None)
                                         fresh_config["questions"].pop(del_tab_target, None)
@@ -1046,9 +1127,9 @@ else:
                                 
                     st.markdown("---")
                     st.subheader("📝 차시별 제출 텍스트 상자(질문 문항) 동적 가변 설정")
-                    target_q_tab = st.selectbox("문항을 편집할 차시 선택", app_config["tabs"])
+                    target_q_tab = st.selectbox("문항을 편집할 차시 선택", app_config.get("tabs", []))
                     if target_q_tab:
-                        current_qs = app_config["questions"].get(target_q_tab, [])
+                        current_qs = app_config.get("questions", {}).get(target_q_tab, [])
                         for q in current_qs: st.text(f" - [{q['id']}] {q.get('label', '')}")
                         q_col1, q_col2 = st.columns(2)
                         with q_col1:
@@ -1057,7 +1138,7 @@ else:
                                 with db_lock:
                                     fresh_config = load_json(CONFIG_FILE, {})
                                     new_id = f"q_{datetime.datetime.now().strftime('%d%H%M%S')}"
-                                    if target_q_tab in fresh_config["questions"]:
+                                    if target_q_tab in fresh_config.get("questions", {}):
                                         fresh_config["questions"][target_q_tab].append({"id": new_id, "label": add_q_label})
                                         save_json(CONFIG_FILE, fresh_config)
                                 st.success("문항 추가 완료."); st.rerun()
@@ -1067,7 +1148,7 @@ else:
                                 if st.button("선택한 문항 삭제", type="primary"):
                                     with db_lock:
                                         fresh_config = load_json(CONFIG_FILE, {})
-                                        if target_q_tab in fresh_config["questions"]:
+                                        if target_q_tab in fresh_config.get("questions", {}):
                                             current_list = fresh_config["questions"][target_q_tab]
                                             fresh_config["questions"][target_q_tab] = [q for q in current_list if q["id"] != del_q_target["id"]]
                                             save_json(CONFIG_FILE, fresh_config)
@@ -1175,15 +1256,15 @@ else:
                                 else:
                                     ans_content = ans.get("content", {})
                                     if isinstance(ans_content, str): ans_content = {"text": ans_content}
-                                    if ans_content.get("text") or ans_content.get("link"):
+                                    if ans_content.get("text") or ans_content.get("link") or ans_content.get("file_name"):
                                         st.markdown(f"**{act}**")
                                         if ans_content.get("text"): st.write(f"📝 {ans_content['text']}")
                                         if ans_content.get("link"): st.write(f"🔗 {ans_content['link']}")
                             
                             st.markdown("---")
                             st.markdown("#### 📍 [2] 차시별 제출 자료")
-                            for t_name in app_config["tabs"]:
-                                for q in app_config["questions"].get(t_name, []):
+                            for t_name in app_config.get("tabs", []):
+                                for q in app_config.get("questions", {}).get(t_name, []):
                                     ans = student_answers.get(t_name, {}).get(q["id"], {})
                                     if isinstance(ans, str): ans = {"text": ans} 
                                     if ans.get("text"):
@@ -1192,7 +1273,7 @@ else:
                                         st.markdown("<br>", unsafe_allow_html=True)
 
                     elif view_mode == "📅 항목별(활동지/차시) 전체 현황 (엑셀 다운로드)":
-                        combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config["tabs"]
+                        combined_list = ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config.get("tabs", [])
                         selected_view = st.selectbox("다운로드할 데이터 범주를 선택하세요", combined_list)
                         
                         if selected_view == ACTIVITIES[0]:
@@ -1417,8 +1498,8 @@ else:
                             df_csv = pd.DataFrame(csv_data)
                             st.download_button(f"📊 {selected_view[:6]} 엑셀 다운로드", data=df_csv.to_csv(index=False, header=False).encode('utf-8-sig'), file_name=f"{selected_view[:6]}_{filter_class}_결과.csv", mime='text/csv', type="primary")
 
-                        elif selected_view in app_config["tabs"]:
-                            for q in app_config["questions"].get(selected_view, []):
+                        elif selected_view in app_config.get("tabs", []):
+                            for q in app_config.get("questions", {}).get(selected_view, []):
                                 st.markdown(f"##### ❓ {q.get('label', '')}")
                                 q_summary_data = []
                                 for s_uid in student_list:
