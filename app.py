@@ -826,7 +826,7 @@ else:
     elif auth_choice == "로그인":
         login_hub = st.sidebar.selectbox("접속할 거점학교", HUB_SCHOOLS)
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사(관리자)"])
-        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 무룡고등학교")
+        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교(원적교)")
         else: login_school = ""
             
         input_id = st.sidebar.text_input("학번/ID")
