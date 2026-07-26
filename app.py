@@ -131,7 +131,7 @@ def display_pdf(file_path):
         st.markdown(f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="450" type="application/pdf"></iframe>', unsafe_allow_html=True)
     else: st.info(f"💡 교재 파일('{file_path}')이 폴더에 없습니다. 파일을 업로드하면 이곳에 표시됩니다.")
 
-# --- 💡 [요청 반영 1] HTML 문서 생성 시 글자 잘림 완전 방지 모듈 ---
+# --- HTML 문서 생성 시 글자 잘림 완전 방지 모듈 ---
 def generate_html_report(u_info, student_answers, target_act=None, app_config=None):
     html_content = f"""<!DOCTYPE html>
     <html lang="ko">
@@ -144,13 +144,11 @@ def generate_html_report(u_info, student_answers, target_act=None, app_config=No
         h2 {{ color: #2c3e50; border-left: 5px solid #3498db; padding-left: 10px; margin-top: 40px; }}
         h3 {{ color: #2980b9; margin-top: 20px; }}
         h4 {{ color: #34495e; margin-top: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }}
-        /* 테이블과 셀(td) 안의 긴 텍스트가 밖으로 튀어나가지 않도록 강제 줄바꿈 설정 */
         table {{ width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; font-size: 15px; table-layout: fixed; word-break: break-all; }}
         th, td {{ border: 1px solid #bdc3c7; padding: 10px; text-align: left; word-wrap: break-word; overflow-wrap: break-word; }}
         th {{ background-color: #ecf0f1; font-weight: bold; text-align: center; }}
         .content-box {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; border: 1px solid #e9ecef; margin-bottom: 20px; white-space: pre-wrap; word-wrap: break-word; }}
         .link-text {{ color: #e74c3c; font-weight: bold; text-decoration: none; }}
-        /* pre 태그 안에서도 엔터 없이 길게 쓴 글씨가 짤리지 않게 강제 줄바꿈 허용 */
         pre {{ white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; font-family: inherit; font-size: inherit; margin: 0; }}
     </style>
     </head>
@@ -285,7 +283,8 @@ def render_activity1_form(user_key):
     st.markdown(INFO_BOX.format("내가 지금까지 다루지 못했던 내용 요소는 무엇이고 그것과 관련된 탐구 주제는 무엇이 있을까?"), unsafe_allow_html=True)
     step3_val = st.text_area("내용을 입력하세요", value=ans.get("step3", ""), height=150)
 
-    if st.button("활동지 최종 제출 및 저장", key="submit_act1", type="primary"):
+    # 💡 [요청 반영 2] 활동지 버튼 문구 변경
+    if st.button("활동지 제출 및 저장", key="submit_act1", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {}) 
             if user_key not in current_data: current_data[user_key] = {}
@@ -372,7 +371,8 @@ def render_activity2_form(user_key):
     with col6: step7_s3 = st.text_input("밝힐점", value=ans.get("step7_s3", ""), label_visibility="collapsed")
     with col7: st.write(")을(를) 밝히려 한다.")
 
-    if st.button("활동지 최종 제출 및 저장", key="submit_act2", type="primary"):
+    # 💡 [요청 반영 2] 활동지 버튼 문구 변경
+    if st.button("활동지 제출 및 저장", key="submit_act2", type="primary"):
         with db_lock: 
             current_data = load_json(DATA_FILE, {}) 
             if user_key not in current_data: current_data[user_key] = {}
@@ -394,7 +394,8 @@ def render_feedback_form(user_key, category, rows):
     default_df = pd.DataFrame([{"구분": r, "피드백 내용 (구체적으로)": "", "보완 및 수정 계획": ""} for r in rows])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["구분"], key=f"df_{category}")
-    if st.button("활동지 최종 제출 및 저장", key=f"btn_{category}", type="primary"):
+    # 💡 [요청 반영 2] 활동지 버튼 문구 변경
+    if st.button("활동지 제출 및 저장", key=f"btn_{category}", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -414,7 +415,8 @@ def render_activity4_form(user_key):
     default_df = pd.DataFrame([{"사이트명": "", "제목": "", "내용": "", "선정이유": ""} for _ in range(5)])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, num_rows="dynamic", hide_index=True, use_container_width=True, key=f"df_{category}")
-    if st.button("활동지 최종 제출 및 저장", key=f"btn_{category}", type="primary"):
+    # 💡 [요청 반영 2] 활동지 버튼 문구 변경
+    if st.button("활동지 제출 및 저장", key=f"btn_{category}", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -488,7 +490,8 @@ def render_activity5_form(user_key):
     st.markdown("**나. 웹사이트/기사**")
     ref_web = st.text_area("웹사이트/기사", value=ans.get("ref_web", ""), placeholder="사이트명, 기사 제목, URL, 접속일자", label_visibility="collapsed")
 
-    if st.button("활동지 최종 제출 및 저장", key="btn_act5", type="primary"):
+    # 💡 [요청 반영 2] 활동지 버튼 문구 변경
+    if st.button("활동지 제출 및 저장", key="btn_act5", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -516,7 +519,8 @@ def render_activity8_form(user_key):
     ])
     df = pd.DataFrame(ans.get("df1", default_df.to_dict('records')))
     edited_df = st.data_editor(df, hide_index=True, use_container_width=True, disabled=["항목"], key=f"df_{category}")
-    if st.button("활동지 최종 제출 및 저장", key="btn_act8", type="primary"):
+    # 💡 [요청 반영 2] 활동지 버튼 문구 변경
+    if st.button("활동지 제출 및 저장", key="btn_act8", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -550,7 +554,8 @@ def render_activity9_form(user_key):
     df2 = pd.DataFrame(ans.get("df2", default_df2.to_dict('records')))
     edited_df2 = st.data_editor(df2, hide_index=True, use_container_width=True, disabled=["시기", "중점 목표"], key="act9_df2")
 
-    if st.button("활동지 최종 제출 및 저장", key="btn_act9", type="primary"):
+    # 💡 [요청 반영 2] 활동지 버튼 문구 변경
+    if st.button("활동지 제출 및 저장", key="btn_act9", type="primary"):
         with db_lock:
             current_data = load_json(DATA_FILE, {})
             if user_key not in current_data: current_data[user_key] = {}
@@ -637,7 +642,6 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
 # --- [4] 메인 프로그램 세팅 및 사이드바 ---
 st.set_page_config(page_title="주제 탐구 캠프 시스템", layout="wide")
 
-# 💡 [요청 반영 2] 교사 화면 탭(Tab) 및 라디오/셀렉트박스 글자 크기, 굵기 대폭 상향
 st.markdown("""
 <style>
 [data-testid="stFormSubmitButton"] button, button[kind="primary"] {
@@ -693,7 +697,6 @@ button[kind="secondary"] p {
     font-size: 16px !important;
 }
 
-/* 💡 관리자 화면 핵심 개선: 탭 메뉴 폰트 크기 및 굵기 극대화 */
 div[data-testid="stTabs"] button[role="tab"] p {
     font-size: 22px !important;
     font-weight: 900 !important;
@@ -704,28 +707,24 @@ div[data-testid="stTabs"] button[role="tab"] {
     padding-bottom: 10px !important;
 }
 
-/* 💡 관리자 화면 핵심 개선: 라디오 버튼 라벨(제목) 폰트 극대화 */
 div[data-testid="stRadio"] > label > div > p {
     font-size: 20px !important;
     font-weight: 900 !important;
     color: #000 !important;
 }
 
-/* 💡 관리자 화면 핵심 개선: 라디오 버튼 항목 폰트 굵게 */
 div[data-testid="stRadio"] div[role="radiogroup"] label p {
     font-size: 18px !important;
     font-weight: 800 !important;
     color: #222 !important;
 }
 
-/* 💡 관리자 화면 핵심 개선: 셀렉트박스 라벨(제목) 폰트 극대화 */
 div[data-testid="stSelectbox"] > label > div > p {
     font-size: 20px !important;
     font-weight: 900 !important;
     color: #000 !important;
 }
 
-/* 💡 관리자 화면 핵심 개선: 셀렉트박스 선택 항목 폰트 조정 */
 div[data-testid="stSelectbox"] div[data-baseweb="select"] span {
     font-size: 18px !important;
     font-weight: 700 !important;
@@ -829,7 +828,8 @@ else:
         reg_hub = st.sidebar.selectbox("거점학교 선택", HUB_SCHOOLS)
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
         if reg_role == "학생": 
-            reg_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 무룡고등학교")
+            # 💡 [요청 반영 1] placeholder 문구 삭제
+            reg_school = st.sidebar.text_input("소속 학교(원적교)")
             reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
         else: 
             reg_school = "교사소속"; reg_class = "교사"
@@ -854,7 +854,9 @@ else:
     elif auth_choice == "로그인":
         login_hub = st.sidebar.selectbox("접속할 거점학교", HUB_SCHOOLS)
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사(관리자)"])
-        if login_type == "학생": login_school = st.sidebar.text_input("소속 학교(원적교)", placeholder="예: 무룡고등학교")
+        if login_type == "학생": 
+            # 💡 [요청 반영 1] placeholder 문구 삭제
+            login_school = st.sidebar.text_input("소속 학교(원적교)")
         else: login_school = ""
             
         input_id = st.sidebar.text_input("학번/ID")
@@ -1290,7 +1292,7 @@ else:
                                 else:
                                     ans_content = ans.get("content", {})
                                     if isinstance(ans_content, str): ans_content = {"text": ans_content}
-                                    if ans_content.get("text") or ans_content.get("link"):
+                                    if ans_content.get("text") or ans_content.get("link") or ans_content.get("file_name"):
                                         st.markdown(f"**{act}**")
                                         if ans_content.get("text"): st.write(f"📝 {ans_content['text']}")
                                         if ans_content.get("link"): st.write(f"🔗 {ans_content['link']}")
