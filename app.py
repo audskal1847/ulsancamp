@@ -44,6 +44,7 @@ INFO_BOX = "<div style='background-color: #f0f4f8; padding: 15px; border-radius:
 
 db_lock = threading.Lock()
 
+# 💡 [요청 반영] 상황에 맞는 메시지를 출력할 수 있도록 업그레이드된 완료 메시지 함수
 def show_success_message(title="🎉 화면 저장이 완료되었습니다!", desc="입력하신 내용이 데이터베이스에 안전하게 저장되었습니다."):
     st.balloons()
     st.markdown(f"""
@@ -970,16 +971,12 @@ else:
 
         elif current_role in ["교사", "관리자"]:
             st.title(f"🛠️ {current_role} 대시보드 ({current_hub})")
+            if current_role == "관리자": menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 메인 화면 및 일정 편집", "📥 학생 제출 자료 조회 및 관리"])
+            else: menu_tabs = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "📥 학생 제출 자료 조회 및 관리"])
             
-            # 💡 [핵심 추가] 탭 구조에 "💾 DB 백업 및 복구" 탭 추가
-            if current_role == "관리자": 
-                tab_home, tab_user, tab_edit, tab_view, tab_db = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 메인 화면 및 일정 편집", "📥 학생 제출 자료 조회 및 관리", "💾 DB 백업 및 복구"])
-            else: 
-                tab_home, tab_user, tab_view = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "📥 학생 제출 자료 조회 및 관리"])
-            
-            with tab_home: render_camp_overview(current_role, current_hub)
+            with menu_tabs[0]: render_camp_overview(current_role, current_hub)
 
-            with tab_user:
+            with menu_tabs[1]:
                 all_users = load_json(USERS_FILE, {})
                 hub_users = {k: v for k, v in all_users.items() if v.get("role") == "관리자" or v.get("hub_school", "호계고등학교") == current_hub}
                 pending_users = {k: v for k, v in hub_users.items() if not v.get("approved", True)}
@@ -1012,6 +1009,7 @@ else:
                             st.session_state.msg_user_appr_all = True
                             st.rerun()
                             
+                    # 💡 [요청 반영] 시각적 알림 메시지 (회원 승인)
                     if st.session_state.get("msg_user_appr") or st.session_state.get("msg_user_appr_all"):
                         show_success_message("🎉 승인이 완료되었습니다!", "가입 승인이 성공적으로 처리되었습니다.")
                         st.session_state.msg_user_appr = False
@@ -1059,6 +1057,7 @@ else:
                                 st.session_state.msg_pw_change = True
                                 st.rerun()
 
+                    # 💡 [요청 반영] 시각적 알림 메시지 (회원 관리)
                     if st.session_state.get("msg_user_del"):
                         show_success_message("🎉 삭제가 완료되었습니다!", "선택한 회원이 시스템에서 완전히 삭제되었습니다.")
                         st.session_state.msg_user_del = False
@@ -1067,7 +1066,7 @@ else:
                         st.session_state.msg_pw_change = False
 
             if current_role == "관리자":
-                with tab_edit:
+                with menu_tabs[2]:
                     st.subheader("📅 캠프 일정표 관리")
                     st.info("💡 학교마다 다른 캠프 일정을 여기에서 수정하면 학생 메인 화면의 표에 즉시 반영됩니다.")
                     
@@ -1084,6 +1083,7 @@ else:
                         st.session_state.msg_schedule = True
                         st.rerun()
                         
+                    # 💡 [요청 반영] 시각적 알림 메시지 (일정표 저장)
                     if st.session_state.get("msg_schedule"):
                         show_success_message("🎉 일정표 저장이 완료되었습니다!", "새로운 캠프 일정이 학생들 화면에 즉각적으로 반영되었습니다.")
                         st.session_state.msg_schedule = False
@@ -1111,6 +1111,7 @@ else:
                                 else:
                                     st.warning("제목과 내용을 모두 입력해주세요.")
                     
+                        # 💡 [요청 반영] 시각적 알림 메시지 (블록 추가)
                         if st.session_state.get("msg_add_block"):
                             show_success_message("🎉 블록 생성이 완료되었습니다!", "입력하신 공지 블록이 메인 화면에 성공적으로 추가되었습니다.")
                             st.session_state.msg_add_block = False
@@ -1130,6 +1131,7 @@ else:
                         else:
                             st.info("현재 등록된 커스텀 블록이 없습니다.")
                             
+                        # 💡 [요청 반영] 시각적 알림 메시지 (블록 삭제)
                         if st.session_state.get("msg_del_block"):
                             show_success_message("🎉 블록 삭제가 완료되었습니다!", "선택하신 텍스트 블록이 메인 화면에서 지워졌습니다.")
                             st.session_state.msg_del_block = False
@@ -1173,6 +1175,7 @@ else:
                                 else:
                                     st.warning("모든 칸을 입력해주세요.")
                                     
+                        # 💡 [요청 반영] 시각적 알림 메시지 (링크 추가)
                         if st.session_state.get("msg_add_link"):
                             show_success_message("🎉 링크 추가가 완료되었습니다!", "새로운 바로가기 링크가 학생들 화면에 배포되었습니다.")
                             st.session_state.msg_add_link = False
@@ -1191,6 +1194,7 @@ else:
                         else:
                             st.info("등록된 링크가 없습니다.")
                             
+                        # 💡 [요청 반영] 시각적 알림 메시지 (링크 삭제)
                         if st.session_state.get("msg_del_link"):
                             show_success_message("🎉 링크 삭제가 완료되었습니다!", "선택하신 링크가 메인 화면에서 지워졌습니다.")
                             st.session_state.msg_del_link = False
@@ -1223,6 +1227,7 @@ else:
                                 st.session_state.msg_add_mat = True
                                 st.rerun()
                                 
+                    # 💡 [요청 반영] 시각적 알림 메시지 (자료 업로드)
                     if st.session_state.get("msg_add_mat"):
                         show_success_message("🎉 특강 자료 등록이 완료되었습니다!", "업로드하신 자료가 교사용 자료실에 안전하게 보관되었습니다.")
                         st.session_state.msg_add_mat = False
@@ -1240,6 +1245,7 @@ else:
                             st.session_state.msg_del_mat = True
                             st.rerun()
                             
+                    # 💡 [요청 반영] 시각적 알림 메시지 (자료 삭제)
                     if st.session_state.get("msg_del_mat"):
                         show_success_message("🎉 자료 삭제가 완료되었습니다!", "선택하신 특강 자료가 삭제되었습니다.")
                         st.session_state.msg_del_mat = False
@@ -1265,6 +1271,7 @@ else:
                             st.session_state.msg_add_tab = True
                             st.rerun()
                             
+                        # 💡 [요청 반영] 시각적 알림 메시지 (차시 추가)
                         if st.session_state.get("msg_add_tab"):
                             show_success_message("🎉 차시 개설이 완료되었습니다!", "새로운 학습 차시(탭)가 학생 화면에 열렸습니다.")
                             st.session_state.msg_add_tab = False
@@ -1284,6 +1291,7 @@ else:
                                 st.session_state.msg_del_tab = True
                                 st.rerun()
                                 
+                        # 💡 [요청 반영] 시각적 알림 메시지 (차시 삭제)
                         if st.session_state.get("msg_del_tab"):
                             show_success_message("🎉 차시 삭제가 완료되었습니다!", "선택하신 차시와 관련된 질문들이 삭제되었습니다.")
                             st.session_state.msg_del_tab = False
@@ -1307,6 +1315,7 @@ else:
                                 st.session_state.msg_add_q = True
                                 st.rerun()
                                 
+                            # 💡 [요청 반영] 시각적 알림 메시지 (질문 추가)
                             if st.session_state.get("msg_add_q"):
                                 show_success_message("🎉 질문이 추가되었습니다!", "학생들이 입력할 수 있는 새로운 텍스트 칸이 만들어졌습니다.")
                                 st.session_state.msg_add_q = False
@@ -1324,81 +1333,12 @@ else:
                                     st.session_state.msg_del_q = True
                                     st.rerun()
                                     
+                            # 💡 [요청 반영] 시각적 알림 메시지 (질문 삭제)
                             if st.session_state.get("msg_del_q"):
                                 show_success_message("🎉 문항 삭제가 완료되었습니다!", "선택하신 텍스트 입력칸이 시스템에서 삭제되었습니다.")
                                 st.session_state.msg_del_q = False
 
-                # 💡 [새로운 탭 추가] 오직 관리자에게만 보이는 DB 백업 및 복구 탭
-                with tab_db:
-                    st.subheader("💾 시스템 데이터베이스(DB) 백업 및 복구")
-                    st.error("🚨 **[주의]** 데이터 복구(업로드) 시 기존 데이터는 모두 지워지고 업로드한 파일로 완전히 덮어씌워집니다. 과거 자료 복원을 원하실 때만 신중하게 작업해 주세요!")
-                    
-                    col_db1, col_db2 = st.columns(2)
-                    
-                    with col_db1:
-                        st.markdown("#### 1️⃣ 현재 시스템 DB 다운로드 (백업)")
-                        st.info("💡 코드 업데이트 전, 만약의 사태에 대비하여 반드시 아래 파일들을 다운로드하여 개인 PC에 안전하게 보관하세요.")
-                        
-                        if os.path.exists(DATA_FILE):
-                            with open(DATA_FILE, "r", encoding="utf-8") as f: db_data = f.read()
-                            st.download_button("📥 1. 학생 학습 데이터 백업 (learning_data.json)", data=db_data.encode('utf-8'), file_name=f"learning_data_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json", mime="application/json", use_container_width=True)
-                        
-                        if os.path.exists(USERS_FILE):
-                            with open(USERS_FILE, "r", encoding="utf-8") as f: users_data = f.read()
-                            st.download_button("📥 2. 회원 정보 데이터 백업 (users.json)", data=users_data.encode('utf-8'), file_name=f"users_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json", mime="application/json", use_container_width=True)
-                            
-                        if os.path.exists(CONFIG_FILE):
-                            with open(CONFIG_FILE, "r", encoding="utf-8") as f: config_data = f.read()
-                            st.download_button("📥 3. 시스템 설정 데이터 백업 (config.json)", data=config_data.encode('utf-8'), file_name=f"config_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json", mime="application/json", use_container_width=True)
-
-                    with col_db2:
-                        st.markdown("#### 2️⃣ 과거 시스템 DB 불러오기 (복구)")
-                        st.info("💡 보관해둔 json 파일을 아래에 각각 업로드하면 시스템이 과거 상태로 100% 복구됩니다.")
-                        
-                        uploaded_learning = st.file_uploader("📂 [1] 학생 학습 데이터 복구 (learning_data.json)", type=['json'])
-                        if uploaded_learning and st.button("학생 학습 데이터 덮어쓰기", type="primary", key="btn_restore_learning"):
-                            try:
-                                loaded_data = json.load(uploaded_learning)
-                                with db_lock: save_json(DATA_FILE, loaded_data)
-                                st.session_state.msg_restore_learning = True
-                                st.rerun()
-                            except Exception:
-                                st.error("올바른 JSON 파일이 아닙니다.")
-                        if st.session_state.get("msg_restore_learning"):
-                            show_success_message("🎉 학생 데이터 복구 완료!", "업로드하신 과거 파일로 학생들의 학습 데이터가 성공적으로 복원되었습니다.")
-                            st.session_state.msg_restore_learning = False
-                            
-                        st.markdown("---")
-                        
-                        uploaded_users = st.file_uploader("📂 [2] 회원 정보 데이터 복구 (users.json)", type=['json'])
-                        if uploaded_users and st.button("회원 정보 데이터 덮어쓰기", type="primary", key="btn_restore_users"):
-                            try:
-                                loaded_users = json.load(uploaded_users)
-                                with db_lock: save_json(USERS_FILE, loaded_users)
-                                st.session_state.msg_restore_users = True
-                                st.rerun()
-                            except Exception:
-                                st.error("올바른 JSON 파일이 아닙니다.")
-                        if st.session_state.get("msg_restore_users"):
-                            show_success_message("🎉 회원 정보 복구 완료!", "회원 계정 데이터가 성공적으로 덮어씌워졌습니다.")
-                            st.session_state.msg_restore_users = False
-
-                        st.markdown("---")
-                        
-                        uploaded_config = st.file_uploader("📂 [3] 시스템 설정 데이터 복구 (config.json)", type=['json'])
-                        if uploaded_config and st.button("시스템 설정 데이터 덮어쓰기", type="primary", key="btn_restore_config"):
-                            try:
-                                loaded_config = json.load(uploaded_config)
-                                with db_lock: save_json(CONFIG_FILE, loaded_config)
-                                st.session_state.msg_restore_config = True
-                                st.rerun()
-                            except Exception:
-                                st.error("올바른 JSON 파일이 아닙니다.")
-                        if st.session_state.get("msg_restore_config"):
-                            show_success_message("🎉 시스템 설정 복구 완료!", "캠프 일정 및 링크 설정 등이 과거 상태로 복구되었습니다.")
-                            st.session_state.msg_restore_config = False
-
-            with tab_view:
+            with menu_tabs[-1]:
                 col_title, col_btn = st.columns([8, 2])
                 with col_title:
                     st.subheader("📥 학생 학습 활동 및 제출 자료 실시간 조회")
