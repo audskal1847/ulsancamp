@@ -30,13 +30,13 @@ def _load_initial_config():
 _init_config = _load_initial_config()
 HUB_SCHOOLS = _init_config.get("hub_schools", ["호계고등학교", "함월고등학교", "성광여자고등학교"])
 
+# 💡 [요청 1 반영] audskal 계정 정식 관리자 명단에 추가 완료
 ADMIN_ACCOUNTS = {
     "admin": {"pw": "admin00", "name": "정현경", "school": "울산여자고등학교"},
     "admin1": {"pw": "admin11", "name": "임종우", "school": "신선여자고등학교"},
-    "admin2": {"pw": "admin22", "name": "김명남", "school": "신선여자고등학교"},
+    "audskal": {"pw": "1847", "name": "김명남", "school": "신선여자고등학교"},
     "admin3": {"pw": "admin33", "name": "김민성", "school": "매곡고등학교"},
-    "admin4": {"pw": "admin44", "name": "이학승", "school": "함월고등학교"},
-    "audskal": {"pw": "1847", "name": "김명남", "school": "신선여자고등학교"}
+    "admin4": {"pw": "admin44", "name": "이학승", "school": "함월고등학교"}
 }
 
 ACTIVITIES = [
@@ -778,7 +778,7 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
 }
 .back-btn-wrapper { display: none; }
 
-/* 💡 [요청 반영] 글자 크기를 키우고 더 진하게(Black/Bold) 설정 */
+/* 💡 [요청 2 반영] 글자 크기를 키우고 더 진하게 설정하되, 입력창 검은색 테두리 오류 삭제 */
 .stMarkdown p, .stMarkdown span, .stMarkdown label {
     font-size: 19px !important;
     color: #000000 !important;
@@ -789,7 +789,6 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
 .stTextInput input, .stTextArea textarea {
     font-size: 19px !important;
     color: #000000 !important;
-    border: 2px solid #333 !important;
     font-weight: 800 !important;
 }
 
@@ -915,63 +914,75 @@ else:
     
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
+        # 💡 [요청 3 반영] 폼(form) 구조 적용 - 엔터키로 가입신청 가능
         reg_hub = st.sidebar.selectbox("거점학교 선택", HUB_SCHOOLS)
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
-        if reg_role == "학생": 
-            reg_school = st.sidebar.text_input("소속 학교(원적교)")
-            reg_class = st.sidebar.selectbox("소속 분반", CLASS_GROUPS)
-        else: 
-            reg_school = "교사소속"; reg_class = "교사"
-            
-        reg_id = st.sidebar.text_input("학번/ID 입력")
-        reg_name = st.sidebar.text_input("이름 입력")
-        reg_pw = st.sidebar.text_input("비밀번호", type="password")
         
-        if st.sidebar.button("가입 신청", type="primary", use_container_width=True):
-            if reg_role and reg_id and reg_pw and reg_name and reg_school:
-                user_key = f"{reg_school}_{reg_id}" if reg_role == "학생" else f"teacher_{reg_id}"
-                with db_lock:
-                    fresh_users = load_json(USERS_FILE, {}) 
-                    if user_key in fresh_users: 
-                        st.sidebar.error("❌ 해당 학번/ID가 이미 존재합니다.")
-                    else:
-                        fresh_users[user_key] = {"id": reg_id, "password": reg_pw, "name": reg_name, "role": reg_role, "school": reg_school if reg_role == "학생" else "소속없음", "class_group": reg_class, "approved": False, "hub_school": reg_hub}
-                        save_json(USERS_FILE, fresh_users)
-                        st.sidebar.success("🎉 가입 완료! 관리자의 승인을 기다려주세요.")
-            else: st.sidebar.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
+        with st.sidebar.form("register_form"):
+            if reg_role == "학생": 
+                reg_school = st.text_input("소속 학교(원적교)")
+                reg_class = st.selectbox("소속 분반", CLASS_GROUPS)
+            else: 
+                reg_school = "교사소속"; reg_class = "교사"
+                
+            reg_id = st.text_input("학번/ID 입력")
+            reg_name = st.text_input("이름 입력")
+            reg_pw = st.text_input("비밀번호", type="password")
+            
+            submitted = st.form_submit_button("가입 신청", type="primary", use_container_width=True)
+            
+            if submitted:
+                if reg_role and reg_id and reg_pw and reg_name and reg_school:
+                    user_key = f"{reg_school}_{reg_id}" if reg_role == "학생" else f"teacher_{reg_id}"
+                    with db_lock:
+                        fresh_users = load_json(USERS_FILE, {}) 
+                        if user_key in fresh_users: 
+                            st.error("❌ 해당 학번/ID가 이미 존재합니다.")
+                        else:
+                            fresh_users[user_key] = {"id": reg_id, "password": reg_pw, "name": reg_name, "role": reg_role, "school": reg_school if reg_role == "학생" else "소속없음", "class_group": reg_class, "approved": False, "hub_school": reg_hub}
+                            save_json(USERS_FILE, fresh_users)
+                            st.success("🎉 가입 완료! 관리자의 승인을 기다려주세요.")
+                else: 
+                    st.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
+        # 💡 [요청 3 반영] 폼(form) 구조 적용 - 엔터키로 로그인 가능
         login_hub = st.sidebar.selectbox("접속할 거점학교", HUB_SCHOOLS)
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사(관리자)"])
-        if login_type == "학생": 
-            login_school = st.sidebar.text_input("소속 학교(원적교)")
-        else: login_school = ""
-            
-        input_id = st.sidebar.text_input("학번/ID")
-        input_pw = st.sidebar.text_input("비밀번호", type="password")
         
-        if st.sidebar.button("로그인", type="primary", use_container_width=True):
-            if login_type == "교사(관리자)" and input_id in ADMIN_ACCOUNTS and input_pw == ADMIN_ACCOUNTS[input_id]["pw"]:
-                admin_info = ADMIN_ACCOUNTS[input_id]
-                st.session_state.logged_in = True
-                st.session_state.user_info = {"user_key": input_id, "username": input_id, "name": admin_info["name"], "role": "관리자", "school": admin_info["school"], "class_group": "관리자", "hub_school": login_hub}
-                st.query_params["session_token"] = encode_token(input_id, login_hub)
-                st.rerun()
-            else:
-                user_key = f"{login_school}_{input_id}" if login_type == "학생" else f"teacher_{input_id}"
-                if user_key in users and users[user_key].get("password") == input_pw:
-                    db_role = users[user_key].get("role")
-                    if (login_type == "학생" and db_role == "학생") or (login_type == "교사(관리자)" and db_role == "교사"):
-                        if users[user_key].get("hub_school", "호계고등학교") == login_hub:
-                            if users[user_key].get("approved", True):
-                                st.session_state.logged_in = True
-                                st.session_state.user_info = {"user_key": user_key, "username": users[user_key].get("id", input_id), "name": users[user_key].get("name", "이름없음"), "role": db_role, "school": users[user_key].get("school", "소속없음"), "class_group": users[user_key].get("class_group", "미배정"), "hub_school": login_hub}
-                                st.query_params["session_token"] = encode_token(user_key, login_hub)
-                                st.rerun()
-                            else: st.sidebar.warning("⏳ 관리자(교사)의 가입 승인을 대기 중입니다.")
-                        else: st.sidebar.error("❌ 선택하신 거점학교에 등록된 계정이 아닙니다.")
-                    else: st.sidebar.error("❌ 가입하신 계정 유형이 다릅니다.")
-                else: st.sidebar.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
+        with st.sidebar.form("login_form"):
+            if login_type == "학생": 
+                login_school = st.text_input("소속 학교(원적교)")
+            else: 
+                login_school = ""
+                
+            input_id = st.text_input("학번/ID")
+            input_pw = st.text_input("비밀번호", type="password")
+            
+            submitted = st.form_submit_button("로그인", type="primary", use_container_width=True)
+            
+            if submitted:
+                if login_type == "교사(관리자)" and input_id in ADMIN_ACCOUNTS and input_pw == ADMIN_ACCOUNTS[input_id]["pw"]:
+                    admin_info = ADMIN_ACCOUNTS[input_id]
+                    st.session_state.logged_in = True
+                    st.session_state.user_info = {"user_key": input_id, "username": input_id, "name": admin_info["name"], "role": "관리자", "school": admin_info["school"], "class_group": "관리자", "hub_school": login_hub}
+                    st.query_params["session_token"] = encode_token(input_id, login_hub)
+                    st.rerun()
+                else:
+                    user_key = f"{login_school}_{input_id}" if login_type == "학생" else f"teacher_{input_id}"
+                    if user_key in users and users[user_key].get("password") == input_pw:
+                        db_role = users[user_key].get("role")
+                        if (login_type == "학생" and db_role == "학생") or (login_type == "교사(관리자)" and db_role == "교사"):
+                            if users[user_key].get("hub_school", "호계고등학교") == login_hub:
+                                if users[user_key].get("approved", True):
+                                    st.session_state.logged_in = True
+                                    st.session_state.user_info = {"user_key": user_key, "username": users[user_key].get("id", input_id), "name": users[user_key].get("name", "이름없음"), "role": db_role, "school": users[user_key].get("school", "소속없음"), "class_group": users[user_key].get("class_group", "미배정"), "hub_school": login_hub}
+                                    st.query_params["session_token"] = encode_token(user_key, login_hub)
+                                    st.rerun()
+                                else: st.warning("⏳ 관리자(교사)의 가입 승인을 대기 중입니다.")
+                            else: st.error("❌ 선택하신 거점학교에 등록된 계정이 아닙니다.")
+                        else: st.error("❌ 가입하신 계정 유형이 다릅니다.")
+                    else: st.error("❌ 학교, 학번/ID 또는 비밀번호가 틀렸습니다.")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("<div style='text-align: center; color: #222; font-size: 15px; font-weight: 900;'>🧑‍💻 만든 이:<br><span style='font-size: 20px; color: #000;'>Made by G.E.M.S</span><br><span style='font-size: 13px;'>(울산교육청 진학지원단)</span></div>", unsafe_allow_html=True)
@@ -1446,9 +1457,9 @@ else:
                             st.session_state.msg_del_mat = True
                             st.rerun()
                             
-                    if st.session_state.get("msg_del_mat"):
-                        show_success_message("🎉 자료 삭제가 완료되었습니다!", "선택하신 특강 자료가 삭제되었습니다.")
-                        st.session_state.msg_del_mat = False
+                        if st.session_state.get("msg_del_mat"):
+                            show_success_message("🎉 자료 삭제가 완료되었습니다!", "선택하신 특강 자료가 삭제되었습니다.")
+                            st.session_state.msg_del_mat = False
 
                     st.markdown("---")
                     st.subheader("⚙️ 차시(Tab) 동적 제어")
@@ -1751,14 +1762,12 @@ else:
                                         st.markdown("<br>", unsafe_allow_html=True)
 
                     elif view_mode == "📅 항목별(활동지/차시) 전체 현황 (엑셀 다운로드)":
-                        # 💡 [핵심 추가 2] 반별 순서(1반 -> 2반 -> 3반 -> 4반)로 정렬되는 전체 일괄 다운로드 옵션 추가
                         combined_list = ["📁 [전체 일괄 다운로드] 모든 활동지 내용 모아보기 (반별 순서 정렬)"] + ["--- [활동지 데이터 목록] ---"] + ACTIVITIES + ["--- [학습 차시 데이터 목록] ---"] + app_config.get("tabs", [])
                         selected_view = st.selectbox("다운로드할 데이터 범주를 선택하세요", combined_list)
                         
                         if selected_view == "📁 [전체 일괄 다운로드] 모든 활동지 내용 모아보기 (반별 순서 정렬)":
                             st.info("💡 1반 학생부터 시작하여 반별 순서대로 모든 활동지 및 차시 내용이 정렬된 통합 일괄 다운로드 파일(CSV)을 생성합니다.")
                             
-                            # 반별로 학생 정렬 (1반 -> 2반 -> 3반 -> 4반 순)
                             sorted_student_list = sorted(student_list, key=lambda s_uid: (all_users[s_uid].get("class_group", "미배정"), all_users[s_uid].get("name", "")))
                             
                             csv_data = []
@@ -1819,7 +1828,6 @@ else:
                                                 for row in v: csv_data.append([str(row.get("항목", row.get("구분", ""))), str(row.get("내용", row.get("도서명 / 저자", ""))), str(row.get("선정 이유 (탐구 활동과의 연결고리)", row.get("중점 목표", ""))), str(row.get("주요 활동 계획 (주제탐구, 독서, 실험 등)", "")), "", ""])
                                     csv_data.append(["", "", "", "", "", ""])
                                 
-                                # 차시별 데이터 추가
                                 for t_name in app_config.get("tabs", []):
                                     t_ans = s_ans.get(t_name, {})
                                     if t_ans:
@@ -2073,3 +2081,4 @@ else:
                                 df_q = pd.DataFrame(q_summary_data)
                                 st.dataframe(df_q, use_container_width=True, hide_index=True)
                                 st.download_button(f"📊 문항 데이터 다운로드 ({filter_class})", data=df_q.to_csv(index=False).encode('utf-8-sig'), file_name=f"{selected_view}_{target_hub}_{filter_class}_결과.csv", mime='text/csv', key=f"csv_{q['id']}")
+[source: 1]```
