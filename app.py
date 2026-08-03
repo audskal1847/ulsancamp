@@ -36,6 +36,7 @@ ADMIN_ACCOUNTS = {
     "admin2": {"pw": "admin22", "name": "김명남", "school": "신선여자고등학교"},
     "admin3": {"pw": "admin33", "name": "김민성", "school": "매곡고등학교"},
     "admin4": {"pw": "admin44", "name": "이학승", "school": "함월고등학교"}
+    "audskal": {"pw": "1847", "name": "김명남", "school": "신선여자고등학교"}
 }
 
 ACTIVITIES = [
