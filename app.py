@@ -30,7 +30,6 @@ def _load_initial_config():
 _init_config = _load_initial_config()
 HUB_SCHOOLS = _init_config.get("hub_schools", ["호계고등학교", "함월고등학교", "성광여자고등학교"])
 
-# 💡 [요청 1 반영] audskal 계정 정식 관리자 명단에 추가 완료
 ADMIN_ACCOUNTS = {
     "admin": {"pw": "admin00", "name": "정현경", "school": "울산여자고등학교"},
     "admin1": {"pw": "admin11", "name": "임종우", "school": "신선여자고등학교"},
@@ -127,9 +126,14 @@ def init_system():
                 {"id": "dl_1", "group": "👥 캠프 사전 안내", "title": "🔗 캠프 사전 안내 노션 사이트", "url": "https://app.notion.com/p/26-3a1b5d2009278095b09cd44692be6056?pvs=11"},
                 {"id": "dl_2", "group": "👥 캠프 사전 안내", "title": "🔗 사전 설문조사 [구글 폼]", "url": "https://forms.gle/4Co5GLdD3M6KEVcs8"},
                 {"id": "dl_3", "group": "📚 대학 전공 가이드북 링크", "title": "📁 대학 전공 가이드북 구글 드라이브 폴더 열기", "url": "https://drive.google.com/drive/folders/18TOhHc0kVvQBa5UcbwlvkQkglOYax8xZ?usp=sharing"},
-                {"id": "dl_4", "group": "📊 만족도 조사 설문 링크 (QR 포함)", "title": "🔗 캠프 만족도 조사 참여하기 (Google Forms)", "url": "https://forms.gle/kqjWnsTE65Jf8QCS6"}
+                {"id": "dl_4", "group": "📢 캠프 사후 안내", "title": "🔗 캠프 만족도 조사", "url": "https://forms.gle/kqjWnsTE65Jf8QCS6"}
             ]
             needs_update = True
+        else:
+            for link in current_config["dynamic_links"]:
+                if "만족도" in link.get("title", "") and link.get("group") != "📢 캠프 사후 안내":
+                    link["group"] = "📢 캠프 사후 안내"
+                    needs_update = True
 
         if "schedule_title" not in current_config:
             current_config["schedule_title"] = "🗓️ 7/23(목) ~ 7/24(금) 일정"
@@ -546,7 +550,7 @@ def render_activity5_form(user_key):
     st.markdown("**다. 탐구 내용 (본론)**")
     content_body = st.text_area("탐구 내용 (본론)", value=ans.get("content_body", ""), placeholder="수집한 자료나 데이터를 바탕으로 실제로 알아낸 내용을 씁니다.", height=200, label_visibility="collapsed")
     st.markdown("**라. 탐구 결과\n1) 결과 요약**")
-    result_summary = st.text_area("결과 요약", value=ans.get("result_summary", ""), placeholder="알아낸 사실이나 데이터 중 핵심만 간단히", label_visibility="collapsed")
+    result_summary = st.text_area("결 요약", value=ans.get("result_summary", ""), placeholder="알아낸 사실이나 데이터 중 핵심만 간단히", label_visibility="collapsed")
     st.markdown("**2) 해석 및 의의**")
     result_meaning = st.text_area("해석 및 의의", value=ans.get("result_meaning", ""), placeholder="그 결과가 무엇을 뜻하는지, 예상과 어떻게 달랐는지 나의 생각을 쓰세요.", label_visibility="collapsed")
 
@@ -693,7 +697,7 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
                 for link in links:
                     st.markdown(f"<a href='{link['url']}' target='_blank' style='{link_style}'>{link['title']}</a>", unsafe_allow_html=True)
                 
-                if "만족도 조사" in group_name:
+                if "사후 안내" in group_name or "만족도 조사" in group_name:
                     qr_image = os.path.join(os.path.dirname(__file__), "image (11).png")
                     if os.path.exists(qr_image): st.image(qr_image, caption="스마트폰 카메라로 스캔하여 만족도 조사에 참여해주세요.", width=300)
         col_idx += 1
@@ -914,11 +918,11 @@ else:
     
     if auth_choice == "회원가입":
         st.sidebar.subheader("📝 회원가입")
-        # 💡 [요청 3 반영] 폼(form) 구조 적용 - 엔터키로 가입신청 가능
         reg_hub = st.sidebar.selectbox("거점학교 선택", HUB_SCHOOLS)
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
         
-        with st.sidebar.form("register_form"):
+        # 💡 [요청 3 반영] 폼(form) 구조 적용 - 테두리 없음(border=False) 및 엔터키 가입 신청
+        with st.sidebar.form("register_form", border=False):
             if reg_role == "학생": 
                 reg_school = st.text_input("소속 학교(원적교)")
                 reg_class = st.selectbox("소속 분반", CLASS_GROUPS)
@@ -946,11 +950,11 @@ else:
                     st.warning("⚠️ 모든 빈칸을 빠짐없이 입력해주세요.")
                 
     elif auth_choice == "로그인":
-        # 💡 [요청 3 반영] 폼(form) 구조 적용 - 엔터키로 로그인 가능
         login_hub = st.sidebar.selectbox("접속할 거점학교", HUB_SCHOOLS)
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사(관리자)"])
         
-        with st.sidebar.form("login_form"):
+        # 💡 [요청 3 반영] 폼(form) 구조 적용 - 테두리 없음(border=False) 및 엔터키 로그인
+        with st.sidebar.form("login_form", border=False):
             if login_type == "학생": 
                 login_school = st.text_input("소속 학교(원적교)")
             else: 
