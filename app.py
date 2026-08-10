@@ -303,9 +303,9 @@ def generate_html_report(u_info, student_answers, target_act=None, app_config=No
                     html_content += f"<div class='content-box'>{ans['text']}</div>"
 
     if auto_print:
+        # [최종 수정] 스크립트 태그 파괴 방지를 위해 Blob 인코딩 방식으로 변경했으므로 문서 자체의 자동 실행 스크립트도 유지 가능함
         html_content += """
         <script>
-            // 페이지 로드 완료 후 0.5초 대기 후 인쇄 창 호출
             window.onload = function() {
                 setTimeout(function() {
                     window.print();
@@ -317,25 +317,31 @@ def generate_html_report(u_info, student_answers, target_act=None, app_config=No
     html_content += "</body></html>"
     return html_content
 
+# [최종 수정] HTML 문자열 충돌 오류 방지를 위해 Base64 -> Blob 변환 방식으로 새 창 팝업 구현
 def render_pdf_link(label, html_content):
-    safe_html = html_content.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"').replace("\n", "\\n").replace("\r", "")
+    b64_html = base64.b64encode(html_content.encode('utf-8')).decode('utf-8')
+    button_id = f"btn_{id(label)}"
     
     js_code = f"""
     <script>
-    function printPDF_{id(label)}() {{
-        var htmlContent = "{safe_html}";
-        // 새로운 창(탭) 열기
-        var printWindow = window.open('', '_blank');
-        if (printWindow) {{
-            printWindow.document.open();
-            printWindow.document.write(htmlContent);
-            printWindow.document.close();
-        }} else {{
+    function openPdf_{button_id}() {{
+        var b64Data = "{b64_html}";
+        var byteCharacters = atob(b64Data);
+        var byteNumbers = new Array(byteCharacters.length);
+        for (var i = 0; i < byteCharacters.length; i++) {{
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }}
+        var byteArray = new Uint8Array(byteNumbers);
+        var blob = new Blob([byteArray], {{type: 'text/html;charset=utf-8'}});
+        var blobUrl = URL.createObjectURL(blob);
+        
+        var printWindow = window.open(blobUrl, '_blank');
+        if (!printWindow) {{
             alert('팝업 차단이 설정되어 있을 수 있습니다. 팝업 차단을 해제해 주세요.');
         }}
     }}
     </script>
-    <button onclick="printPDF_{id(label)}()" style="background-color: #0056b3; color: white; padding: 15px; border-radius: 8px; border: none; font-size: 24px; font-weight: 900; width: 100%; margin-top: 5px; margin-bottom: 15px; cursor: pointer;">
+    <button onclick="openPdf_{button_id}()" style="background-color: #0056b3; color: white; padding: 15px; border-radius: 8px; border: none; font-size: 24px; font-weight: 900; width: 100%; margin-top: 5px; margin-bottom: 15px; cursor: pointer; display: block; box-sizing: border-box;">
         {label}
     </button>
     """
@@ -1226,7 +1232,6 @@ else:
                     editable_students = [u for u, info in all_users.items() if info.get("role") == "학생" and info.get("hub_school", "호계고등학교") == current_hub]
                     
                     if editable_students:
-                        # [수정 1] 검색 필터링 로직 수정 - 공백 제거 후 비교하여 검색이 작동하도록 개선
                         search_ed = st.text_input("🔍 수정할 학생 검색 (이름, 학교, 학번 입력)", key="search_ed")
                         if search_ed:
                             search_term = search_ed.replace(" ", "")
@@ -1268,7 +1273,6 @@ else:
                     editable_users = [u for u in approved_users.keys() if u not in ADMIN_ACCOUNTS]
                     with col1:
                         st.write("❌ **회원 강제 탈퇴(삭제)**")
-                        # [수정 1] 검색 필터링 로직 수정
                         search_del = st.text_input("🔍 삭제할 회원 검색", key="search_del")
                         if search_del:
                             search_term_del = search_del.replace(" ", "")
@@ -1289,7 +1293,6 @@ else:
                                 
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
-                        # [수정 1] 검색 필터링 로직 수정
                         search_pw = st.text_input("🔍 비밀번호 변경할 회원 검색", key="search_pw")
                         if search_pw:
                             search_term_pw = search_pw.replace(" ", "")
