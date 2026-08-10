@@ -303,15 +303,44 @@ def generate_html_report(u_info, student_answers, target_act=None, app_config=No
                     html_content += f"<div class='content-box'>{ans['text']}</div>"
 
     if auto_print:
-        html_content += "<script>window.onload = function() { window.print(); }</script>"
+        html_content += """
+        <script>
+            // 페이지 로드 완료 후 0.5초 대기 후 인쇄 창 호출
+            window.onload = function() {
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            };
+        </script>
+        """
 
     html_content += "</body></html>"
     return html_content
 
 def render_pdf_link(label, html_content):
-    b64_pdf = base64.b64encode(html_content.encode('utf-8-sig')).decode()
-    href = f'<a href="data:text/html;base64,{b64_pdf}" target="_blank" style="display: block; background-color: #0056b3; color: white; padding: 12px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; text-align: center; width: 100%; margin-top: 5px; margin-bottom: 15px;">{label}</a>'
-    st.markdown(href, unsafe_allow_html=True)
+    safe_html = html_content.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"').replace("\n", "\\n").replace("\r", "")
+    
+    js_code = f"""
+    <script>
+    function printPDF_{id(label)}() {{
+        var htmlContent = "{safe_html}";
+        // 새로운 창(탭) 열기
+        var printWindow = window.open('', '_blank');
+        if (printWindow) {{
+            printWindow.document.open();
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+        }} else {{
+            alert('팝업 차단이 설정되어 있을 수 있습니다. 팝업 차단을 해제해 주세요.');
+        }}
+    }}
+    </script>
+    <button onclick="printPDF_{id(label)}()" style="background-color: #0056b3; color: white; padding: 15px; border-radius: 8px; border: none; font-size: 24px; font-weight: 900; width: 100%; margin-top: 5px; margin-bottom: 15px; cursor: pointer;">
+        {label}
+    </button>
+    """
+    components.html(js_code, height=90)
+
 
 def render_download_button(user_key, category):
     current_data = load_json(DATA_FILE, {})
@@ -884,17 +913,14 @@ table td {
 
 init_system()
 
-# 💡 [요청 반영] 브라우저 실시간 임시 저장(Local Storage) 및 세션 유지 Ping 기능 (Option 1 + 3 결합)
 components.html("""
 <script>
 const parentDoc = window.parent.document;
 
-// 1. 세션 유지 (Keep-Alive Ping): 3분마다 서버에 투명한 핑을 보내 로그아웃(세션 만료) 방지
 setInterval(() => {
     fetch(window.parent.location.href, {method: 'HEAD', cache: 'no-store'});
 }, 180000);
 
-// 2. 로컬 스토리지 실시간 임시 저장 (React 상태 동기화 포함)
 function setNativeValue(element, value) {
     const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
     const prototype = Object.getPrototypeOf(element);
@@ -909,15 +935,12 @@ function setNativeValue(element, value) {
 function initAutoSave() {
     const textareas = parentDoc.querySelectorAll('textarea');
     textareas.forEach((ta, index) => {
-        // 고유 키 생성 (URL 쿼리 파라미터와 인덱스 조합)
         const storageKey = 'camp_autosave_' + window.parent.location.search + '_ta_' + index;
         
-        // 입력 시 실시간 로컬 스토리지 저장
         ta.addEventListener('input', function() {
             localStorage.setItem(storageKey, ta.value);
         });
         
-        // 새로고침/재접속 시 칸이 비어있으면 로컬 스토리지에서 자동 복원
         if (ta.value === '' && localStorage.getItem(storageKey)) {
             setNativeValue(ta, localStorage.getItem(storageKey));
             ta.dispatchEvent(new Event('input', { bubbles: true }));
@@ -925,7 +948,6 @@ function initAutoSave() {
     });
 }
 
-// Streamlit의 동적 렌더링을 감지하기 위해 2초마다 바인딩 체크
 setInterval(initAutoSave, 2000);
 </script>
 """, height=0, width=0)
@@ -1204,9 +1226,14 @@ else:
                     editable_students = [u for u, info in all_users.items() if info.get("role") == "학생" and info.get("hub_school", "호계고등학교") == current_hub]
                     
                     if editable_students:
+                        # [수정 1] 검색 필터링 로직 수정 - 공백 제거 후 비교하여 검색이 작동하도록 개선
                         search_ed = st.text_input("🔍 수정할 학생 검색 (이름, 학교, 학번 입력)", key="search_ed")
-                        filtered_ed = [u for u in editable_students if search_ed in all_users[u].get('name','') or search_ed in all_users[u].get('school','') or search_ed in all_users[u].get('id','')]
-                        
+                        if search_ed:
+                            search_term = search_ed.replace(" ", "")
+                            filtered_ed = [u for u in editable_students if search_term in all_users[u].get('name', '').replace(" ", "") or search_term in all_users[u].get('school', '').replace(" ", "") or search_term in all_users[u].get('id', '').replace(" ", "")]
+                        else:
+                            filtered_ed = editable_students
+
                         edit_target = st.selectbox("정보를 수정할 학생을 선택하세요", ["선택"] + filtered_ed, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('school', '소속없음')})")
                         
                         if edit_target != "선택":
@@ -1241,9 +1268,14 @@ else:
                     editable_users = [u for u in approved_users.keys() if u not in ADMIN_ACCOUNTS]
                     with col1:
                         st.write("❌ **회원 강제 탈퇴(삭제)**")
+                        # [수정 1] 검색 필터링 로직 수정
                         search_del = st.text_input("🔍 삭제할 회원 검색", key="search_del")
-                        filtered_del = [u for u in editable_users if search_del in all_users[u].get('name','') or search_del in all_users[u].get('school','') or search_del in all_users[u].get('id','')]
-                        
+                        if search_del:
+                            search_term_del = search_del.replace(" ", "")
+                            filtered_del = [u for u in editable_users if search_term_del in all_users[u].get('name', '').replace(" ", "") or search_term_del in all_users[u].get('school', '').replace(" ", "") or search_term_del in all_users[u].get('id', '').replace(" ", "")]
+                        else:
+                            filtered_del = editable_users
+
                         delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + filtered_del, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if delete_target != "선택":
                             if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제", type="primary"):
@@ -1257,9 +1289,14 @@ else:
                                 
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
+                        # [수정 1] 검색 필터링 로직 수정
                         search_pw = st.text_input("🔍 비밀번호 변경할 회원 검색", key="search_pw")
-                        filtered_pw = [u for u in editable_users if search_pw in all_users[u].get('name','') or search_pw in all_users[u].get('school','') or search_pw in all_users[u].get('id','')]
-                        
+                        if search_pw:
+                            search_term_pw = search_pw.replace(" ", "")
+                            filtered_pw = [u for u in editable_users if search_term_pw in all_users[u].get('name', '').replace(" ", "") or search_term_pw in all_users[u].get('school', '').replace(" ", "") or search_term_pw in all_users[u].get('id', '').replace(" ", "")]
+                        else:
+                            filtered_pw = editable_users
+
                         pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + filtered_pw, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         new_pw = st.text_input("새로운 비밀번호 입력", type="password")
                         if pw_target != "선택":
