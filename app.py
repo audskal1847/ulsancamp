@@ -303,7 +303,6 @@ def generate_html_report(u_info, student_answers, target_act=None, app_config=No
                     html_content += f"<div class='content-box'>{ans['text']}</div>"
 
     if auto_print:
-        # [최종 수정] 스크립트 태그 파괴 방지를 위해 Blob 인코딩 방식으로 변경했으므로 문서 자체의 자동 실행 스크립트도 유지 가능함
         html_content += """
         <script>
             window.onload = function() {
@@ -317,7 +316,6 @@ def generate_html_report(u_info, student_answers, target_act=None, app_config=No
     html_content += "</body></html>"
     return html_content
 
-# [최종 수정] HTML 문자열 충돌 오류 방지를 위해 Base64 -> Blob 변환 방식으로 새 창 팝업 구현
 def render_pdf_link(label, html_content):
     b64_html = base64.b64encode(html_content.encode('utf-8')).decode('utf-8')
     button_id = f"btn_{id(label)}"
@@ -1236,12 +1234,13 @@ else:
                         if search_ed:
                             search_term = search_ed.replace(" ", "")
                             filtered_ed = [u for u in editable_students if search_term in all_users[u].get('name', '').replace(" ", "") or search_term in all_users[u].get('school', '').replace(" ", "") or search_term in all_users[u].get('id', '').replace(" ", "")]
+                            options_ed = filtered_ed if filtered_ed else ["검색 결과 없음"]
                         else:
-                            filtered_ed = editable_students
+                            options_ed = ["선택"] + editable_students
 
-                        edit_target = st.selectbox("정보를 수정할 학생을 선택하세요", ["선택"] + filtered_ed, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('school', '소속없음')})")
+                        edit_target = st.selectbox("정보를 수정할 학생을 선택하세요", options_ed, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('school', '소속없음')})")
                         
-                        if edit_target != "선택":
+                        if edit_target not in ["선택", "검색 결과 없음"]:
                             target_info = all_users[edit_target]
                             with st.form("edit_student_form"):
                                 col_ed1, col_ed2, col_ed3 = st.columns(3)
@@ -1277,11 +1276,12 @@ else:
                         if search_del:
                             search_term_del = search_del.replace(" ", "")
                             filtered_del = [u for u in editable_users if search_term_del in all_users[u].get('name', '').replace(" ", "") or search_term_del in all_users[u].get('school', '').replace(" ", "") or search_term_del in all_users[u].get('id', '').replace(" ", "")]
+                            options_del = filtered_del if filtered_del else ["검색 결과 없음"]
                         else:
-                            filtered_del = editable_users
+                            options_del = ["선택"] + editable_users
 
-                        delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + filtered_del, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
-                        if delete_target != "선택":
+                        delete_target = st.selectbox("삭제할 회원을 선택하세요", options_del, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
+                        if delete_target not in ["선택", "검색 결과 없음"]:
                             if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제", type="primary"):
                                 with db_lock:
                                     fresh_users = load_json(USERS_FILE, {})
@@ -1297,12 +1297,13 @@ else:
                         if search_pw:
                             search_term_pw = search_pw.replace(" ", "")
                             filtered_pw = [u for u in editable_users if search_term_pw in all_users[u].get('name', '').replace(" ", "") or search_term_pw in all_users[u].get('school', '').replace(" ", "") or search_term_pw in all_users[u].get('id', '').replace(" ", "")]
+                            options_pw = filtered_pw if filtered_pw else ["검색 결과 없음"]
                         else:
-                            filtered_pw = editable_users
+                            options_pw = ["선택"] + editable_users
 
-                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + filtered_pw, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
+                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", options_pw, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         new_pw = st.text_input("새로운 비밀번호 입력", type="password")
-                        if pw_target != "선택":
+                        if pw_target not in ["선택", "검색 결과 없음"]:
                             if st.button("비밀번호 변경 적용", type="primary") and new_pw:
                                 with db_lock:
                                     fresh_users = load_json(USERS_FILE, {})
@@ -1801,8 +1802,18 @@ else:
                         st.markdown("---")
                         st.subheader("👤 특정 학생 개별 조회 및 다운로드")
                         
-                        selected_student = st.selectbox("학생 선택", student_list, format_func=lambda x: f"[{all_users[x].get('hub_school', '')}] [{all_users[x].get('class_group', '-')}] {all_users[x].get('school', '-')} {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
-                        if selected_student:
+                        # [최종 수정] 회원 검색 자동 선택 적용
+                        search_view = st.text_input("🔍 조회할 학생 검색 (이름, 학교, 학번 입력)", key="search_view")
+                        if search_view:
+                            search_term_view = search_view.replace(" ", "")
+                            filtered_view = [u for u in student_list if search_term_view in all_users[u].get('name', '').replace(" ", "") or search_term_view in all_users[u].get('school', '').replace(" ", "") or search_term_view in all_users[u].get('id', '').replace(" ", "")]
+                            options_view = filtered_view if filtered_view else ["검색 결과 없음"]
+                        else:
+                            options_view = ["선택"] + student_list
+                        
+                        selected_student = st.selectbox("학생 선택", options_view, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('hub_school', '')}] [{all_users[x].get('class_group', '-')}] {all_users[x].get('school', '-')} {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
+                        
+                        if selected_student not in ["선택", "검색 결과 없음"]:
                             student_answers = learning_data.get(selected_student, {})
                             
                             u_info_for_html = all_users[selected_student]
