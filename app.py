@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import json
 import os
 import base64
@@ -193,7 +194,7 @@ def display_pdf(file_path):
         st.markdown(f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="450" type="application/pdf"></iframe>', unsafe_allow_html=True)
     else: st.info(f"💡 교재 파일('{file_path}')이 폴더에 없습니다. 파일을 업로드하면 이곳에 표시됩니다.")
 
-def generate_html_report(u_info, student_answers, target_act=None, app_config=None):
+def generate_html_report(u_info, student_answers, target_act=None, app_config=None, auto_print=False):
     html_content = f"""<!DOCTYPE html>
     <html lang="ko">
     <head>
@@ -301,20 +302,34 @@ def generate_html_report(u_info, student_answers, target_act=None, app_config=No
                     html_content += f"<h3>▶ [{t_name}] {q.get('label', '')}</h3>"
                     html_content += f"<div class='content-box'>{ans['text']}</div>"
 
+    if auto_print:
+        html_content += "<script>window.onload = function() { window.print(); }</script>"
+
     html_content += "</body></html>"
     return html_content
+
+def render_pdf_link(label, html_content):
+    b64_pdf = base64.b64encode(html_content.encode('utf-8-sig')).decode()
+    href = f'<a href="data:text/html;base64,{b64_pdf}" target="_blank" style="display: block; background-color: #0056b3; color: white; padding: 12px; text-decoration: none; border-radius: 8px; font-weight: 900; font-size: 18px; text-align: center; width: 100%; margin-top: 5px; margin-bottom: 15px;">{label}</a>'
+    st.markdown(href, unsafe_allow_html=True)
 
 def render_download_button(user_key, category):
     current_data = load_json(DATA_FILE, {})
     ans = current_data.get(user_key, {}).get(category, {})
     if ans:
         st.markdown("<br>", unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
         html_data = generate_html_report(st.session_state.user_info, current_data.get(user_key, {}), target_act=category)
-        st.download_button(label=f"📥 제출한 내 내용 다운로드 ({category[:6]} AI 분석용)", 
-                           data=html_data.encode('utf-8-sig'), 
-                           file_name=f"{category}_내용.html", 
-                           mime="text/html",
-                           use_container_width=True)
+        pdf_data = generate_html_report(st.session_state.user_info, current_data.get(user_key, {}), target_act=category, auto_print=True)
+        
+        with col1:
+            st.download_button(label=f"📥 내 활동지 다운로드 (HTML)", 
+                               data=html_data.encode('utf-8-sig'), 
+                               file_name=f"{category}_내용.html", 
+                               mime="text/html",
+                               use_container_width=True)
+        with col2:
+            render_pdf_link("🖨️ PDF 바로 저장(인쇄)", pdf_data)
 
 # --- [3] 활동지별 맞춤형 폼 렌더링 함수들 ---
 def render_activity1_form(user_key):
@@ -550,7 +565,7 @@ def render_activity5_form(user_key):
     st.markdown("**다. 탐구 내용 (본론)**")
     content_body = st.text_area("탐구 내용 (본론)", value=ans.get("content_body", ""), placeholder="수집한 자료나 데이터를 바탕으로 실제로 알아낸 내용을 씁니다.", height=200, label_visibility="collapsed")
     st.markdown("**라. 탐구 결과\n1) 결과 요약**")
-    result_summary = st.text_area("결 요약", value=ans.get("result_summary", ""), placeholder="알아낸 사실이나 데이터 중 핵심만 간단히", label_visibility="collapsed")
+    result_summary = st.text_area("결과 요약", value=ans.get("result_summary", ""), placeholder="알아낸 사실이나 데이터 중 핵심만 간단히", label_visibility="collapsed")
     st.markdown("**2) 해석 및 의의**")
     result_meaning = st.text_area("해석 및 의의", value=ans.get("result_meaning", ""), placeholder="그 결과가 무엇을 뜻하는지, 예상과 어떻게 달랐는지 나의 생각을 쓰세요.", label_visibility="collapsed")
 
@@ -722,24 +737,29 @@ def render_camp_overview(current_role, current_hub, current_user_key=None):
         with col_sdl1:
             st.markdown("**📦 전체 활동 포트폴리오 다운로드**")
             full_html = generate_html_report(st.session_state.user_info, student_answers, target_act=None, app_config=app_config)
+            full_pdf = generate_html_report(st.session_state.user_info, student_answers, target_act=None, app_config=app_config, auto_print=True)
             st.download_button(label="📥 전체 활동 포트폴리오 다운로드 (HTML)",
                                data=full_html.encode('utf-8-sig'),
                                file_name=f"{st.session_state.user_info['name']}_전체포트폴리오.html",
                                mime="text/html",
                                type="primary",
                                use_container_width=True)
+            render_pdf_link("🖨️ 전체 포트폴리오 PDF로 저장(인쇄)", full_pdf)
+            
         with col_sdl2:
             st.markdown("**📄 특정 활동지 개별 다운로드**")
             stu_sel_act = st.selectbox("다운로드할 활동지 선택", ACTIVITIES, key="stu_dl_sel", label_visibility="collapsed")
             s_ans = student_answers.get(stu_sel_act, {})
             if s_ans:
                 act_html = generate_html_report(st.session_state.user_info, student_answers, target_act=stu_sel_act, app_config=app_config)
-                st.download_button(label=f"📥 {stu_sel_act[:6]} 다운로드",
+                act_pdf = generate_html_report(st.session_state.user_info, student_answers, target_act=stu_sel_act, app_config=app_config, auto_print=True)
+                st.download_button(label=f"📥 {stu_sel_act[:6]} 다운로드 (HTML)",
                                    data=act_html.encode('utf-8-sig'),
                                    file_name=f"{st.session_state.user_info['name']}_{stu_sel_act}.html",
                                    mime="text/html",
                                    type="primary",
                                    use_container_width=True)
+                render_pdf_link(f"🖨️ {stu_sel_act[:6]} PDF로 저장(인쇄)", act_pdf)
             else:
                 st.button("아직 작성된 내용이 없습니다", disabled=True, use_container_width=True, key="stu_dl_dis")
 
@@ -782,7 +802,6 @@ div.element-container:has(.back-btn-wrapper) + div.element-container button p {
 }
 .back-btn-wrapper { display: none; }
 
-/* 💡 [요청 2 반영] 글자 크기를 키우고 더 진하게 설정하되, 입력창 검은색 테두리 오류 삭제 */
 .stMarkdown p, .stMarkdown span, .stMarkdown label {
     font-size: 19px !important;
     color: #000000 !important;
@@ -865,6 +884,52 @@ table td {
 
 init_system()
 
+# 💡 [요청 반영] 브라우저 실시간 임시 저장(Local Storage) 및 세션 유지 Ping 기능 (Option 1 + 3 결합)
+components.html("""
+<script>
+const parentDoc = window.parent.document;
+
+// 1. 세션 유지 (Keep-Alive Ping): 3분마다 서버에 투명한 핑을 보내 로그아웃(세션 만료) 방지
+setInterval(() => {
+    fetch(window.parent.location.href, {method: 'HEAD', cache: 'no-store'});
+}, 180000);
+
+// 2. 로컬 스토리지 실시간 임시 저장 (React 상태 동기화 포함)
+function setNativeValue(element, value) {
+    const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
+    const prototype = Object.getPrototypeOf(element);
+    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+    if (valueSetter && valueSetter !== prototypeValueSetter) {
+        prototypeValueSetter.call(element, value);
+    } else {
+        valueSetter.call(element, value);
+    }
+}
+
+function initAutoSave() {
+    const textareas = parentDoc.querySelectorAll('textarea');
+    textareas.forEach((ta, index) => {
+        // 고유 키 생성 (URL 쿼리 파라미터와 인덱스 조합)
+        const storageKey = 'camp_autosave_' + window.parent.location.search + '_ta_' + index;
+        
+        // 입력 시 실시간 로컬 스토리지 저장
+        ta.addEventListener('input', function() {
+            localStorage.setItem(storageKey, ta.value);
+        });
+        
+        // 새로고침/재접속 시 칸이 비어있으면 로컬 스토리지에서 자동 복원
+        if (ta.value === '' && localStorage.getItem(storageKey)) {
+            setNativeValue(ta, localStorage.getItem(storageKey));
+            ta.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+    });
+}
+
+// Streamlit의 동적 렌더링을 감지하기 위해 2초마다 바인딩 체크
+setInterval(initAutoSave, 2000);
+</script>
+""", height=0, width=0)
+
 if "logged_in" not in st.session_state: 
     st.session_state.logged_in = False
     st.session_state.user_info = None
@@ -884,7 +949,20 @@ if not st.session_state.logged_in and "session_token" in st.query_params:
             st.session_state.logged_in = True
             st.session_state.user_info = {"user_key": user_key, "username": users[user_key].get("id", ""), "name": users[user_key].get("name", "이름없음"), "role": db_role, "school": users[user_key].get("school", "소속없음"), "class_group": users[user_key].get("class_group", "미배정"), "hub_school": login_hub}
 
-if "current_page" not in st.session_state: st.session_state.current_page = "main"
+if "current_page" not in st.session_state: 
+    st.session_state.current_page = st.query_params.get("page", "main")
+    st.session_state.last_url_page = st.session_state.current_page
+
+url_page = st.query_params.get("page", "main")
+if url_page != st.session_state.last_url_page:
+    st.session_state.current_page = url_page
+    st.session_state.last_url_page = url_page
+else:
+    st.query_params["page"] = st.session_state.current_page
+    st.session_state.last_url_page = st.session_state.current_page
+    
+if st.session_state.logged_in:
+    st.query_params["session_token"] = encode_token(st.session_state.user_info["user_key"], st.session_state.user_info.get("hub_school", "호계고등학교"))
 
 st.sidebar.title("🔒 인증 센터")
 if st.session_state.logged_in:
@@ -921,7 +999,6 @@ else:
         reg_hub = st.sidebar.selectbox("거점학교 선택", HUB_SCHOOLS)
         reg_role = st.sidebar.selectbox("자격 선택", ["학생", "교사"])
         
-        # 💡 [요청 3 반영] 폼(form) 구조 적용 - 테두리 없음(border=False) 및 엔터키 가입 신청
         with st.sidebar.form("register_form", border=False):
             if reg_role == "학생": 
                 reg_school = st.text_input("소속 학교(원적교)")
@@ -953,7 +1030,6 @@ else:
         login_hub = st.sidebar.selectbox("접속할 거점학교", HUB_SCHOOLS)
         login_type = st.sidebar.radio("로그인 계정 유형", ["학생", "교사(관리자)"])
         
-        # 💡 [요청 3 반영] 폼(form) 구조 적용 - 테두리 없음(border=False) 및 엔터키 로그인
         with st.sidebar.form("login_form", border=False):
             if login_type == "학생": 
                 login_school = st.text_input("소속 학교(원적교)")
@@ -1128,7 +1204,10 @@ else:
                     editable_students = [u for u, info in all_users.items() if info.get("role") == "학생" and info.get("hub_school", "호계고등학교") == current_hub]
                     
                     if editable_students:
-                        edit_target = st.selectbox("정보를 수정할 학생을 선택하세요", ["선택"] + editable_students, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('school', '소속없음')})")
+                        search_ed = st.text_input("🔍 수정할 학생 검색 (이름, 학교, 학번 입력)", key="search_ed")
+                        filtered_ed = [u for u in editable_students if search_ed in all_users[u].get('name','') or search_ed in all_users[u].get('school','') or search_ed in all_users[u].get('id','')]
+                        
+                        edit_target = st.selectbox("정보를 수정할 학생을 선택하세요", ["선택"] + filtered_ed, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('school', '소속없음')})")
                         
                         if edit_target != "선택":
                             target_info = all_users[edit_target]
@@ -1162,7 +1241,10 @@ else:
                     editable_users = [u for u in approved_users.keys() if u not in ADMIN_ACCOUNTS]
                     with col1:
                         st.write("❌ **회원 강제 탈퇴(삭제)**")
-                        delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
+                        search_del = st.text_input("🔍 삭제할 회원 검색", key="search_del")
+                        filtered_del = [u for u in editable_users if search_del in all_users[u].get('name','') or search_del in all_users[u].get('school','') or search_del in all_users[u].get('id','')]
+                        
+                        delete_target = st.selectbox("삭제할 회원을 선택하세요", ["선택"] + filtered_del, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if delete_target != "선택":
                             if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제", type="primary"):
                                 with db_lock:
@@ -1175,7 +1257,10 @@ else:
                                 
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
-                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + editable_users, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
+                        search_pw = st.text_input("🔍 비밀번호 변경할 회원 검색", key="search_pw")
+                        filtered_pw = [u for u in editable_users if search_pw in all_users[u].get('name','') or search_pw in all_users[u].get('school','') or search_pw in all_users[u].get('id','')]
+                        
+                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", ["선택"] + filtered_pw, format_func=lambda x: x if x == "선택" else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         new_pw = st.text_input("새로운 비밀번호 입력", type="password")
                         if pw_target != "선택":
                             if st.button("비밀번호 변경 적용", type="primary") and new_pw:
@@ -1688,14 +1773,18 @@ else:
                             
                             with col_tdl1:
                                 html_content = generate_html_report(u_info_for_html, student_answers, target_act=None, app_config=app_config)
-                                st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')} 전체 포트폴리오 (웹문서)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_전체학습포트폴리오.html", mime="text/html", type="primary", use_container_width=True)
-                            
+                                pdf_content = generate_html_report(u_info_for_html, student_answers, target_act=None, app_config=app_config, auto_print=True)
+                                st.download_button(label=f"📄 {all_users[selected_student].get('name', '학생')} 전체 포트폴리오 (HTML)", data=html_content.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name', '학생')}_전체학습포트폴리오.html", mime="text/html", type="primary", use_container_width=True)
+                                render_pdf_link("🖨️ 전체 포트폴리오 PDF 인쇄", pdf_content)
+                                
                             with col_tdl2:
                                 tch_sel_act = st.selectbox("특정 활동지 선택", ACTIVITIES, key=f"tch_dl_sel_{selected_student}", label_visibility="collapsed")
                                 s_ans = student_answers.get(tch_sel_act, {})
                                 if s_ans:
                                     tch_html = generate_html_report(u_info_for_html, student_answers, target_act=tch_sel_act, app_config=app_config)
+                                    tch_pdf = generate_html_report(u_info_for_html, student_answers, target_act=tch_sel_act, app_config=app_config, auto_print=True)
                                     st.download_button(label=f"📥 {tch_sel_act[:6]} 개별 다운로드", data=tch_html.encode('utf-8-sig'), file_name=f"{all_users[selected_student].get('name')}_{tch_sel_act}.html", mime="text/html", type="primary", use_container_width=True)
+                                    render_pdf_link(f"🖨️ {tch_sel_act[:6]} PDF 인쇄", tch_pdf)
                                 else:
                                     st.button("작성된 내용이 없습니다", disabled=True, use_container_width=True, key=f"tch_dis_{selected_student}")
                             
