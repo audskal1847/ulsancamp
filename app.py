@@ -53,7 +53,15 @@ ACTIVITIES = [
 
 INFO_BOX = "<div style='background-color: #f0f4f8; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: 700; color: #111; margin-bottom: 15px; border-left: 5px solid #0056b3; line-height: 1.5;'>{}</div>"
 
-db_lock = threading.Lock()
+# --- [데이터 초기화/소실 방지] 안전 저장 엔진 연결 ---
+# 기존 db_lock / load_json / save_json 을 camp_storage 모듈의 안전 버전으로 대체합니다.
+# (저장 시 병합 저장 + 원자적 쓰기 + 프로세스 전역 락 + 자동 백업으로 데이터 유실 방지)
+import camp_storage as cs
+cs.register_files(DATA_FILE, USERS_FILE, CONFIG_FILE, UPLOAD_DIR)
+db_lock = cs.db_lock
+load_json = cs.load_json
+save_json = cs.save_json
+cs.start_backup_daemon()   # 자동 백업 시작
 
 def show_success_message(title="🎉 화면 저장이 완료되었습니다!", desc="입력하신 내용이 데이터베이스에 안전하게 저장되었습니다."):
     st.balloons()
@@ -75,22 +83,11 @@ def decode_token(token):
     except:
         return None, None
 
-def load_json(file_path, default_value):
-    if not os.path.exists(file_path):
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(default_value, f, ensure_ascii=False, indent=4)
-        return default_value
-    for _ in range(5):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f: 
-                return json.load(f)
-        except json.JSONDecodeError:
-            time.sleep(0.1)
-    return default_value
-
-def save_json(file_path, data):
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+# --- load_json / save_json 는 camp_storage(cs) 의 안전 버전으로 대체되었습니다. ---
+#     (위 'CLASS_GROUPS' 아래에서 cs.load_json / cs.save_json 로 연결됨)
+#     - save_json 은 저장 직전 디스크의 현재 내용을 다시 읽어 '병합 저장' 하므로,
+#       다른 학생의 데이터가 담긴 키가 어떤 경우에도 사라지지 않습니다.
+#     - '진짜 삭제'가 필요한 곳에서만 save_json(..., allow_delete=True) 를 사용합니다.
 
 def init_system():
     with db_lock:
@@ -1169,7 +1166,7 @@ else:
             st.title(f"🛠️ {current_role} 대시보드 ({current_hub})")
             
             if current_role == "관리자": 
-                tab_home, tab_user, tab_edit, tab_view, tab_db = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 메인 화면 및 일정 편집", "📥 학생 제출 자료 조회 및 관리", "💾 DB 백업 및 복구"])
+                tab_home, tab_user, tab_edit, tab_view, tab_db, tab_backup = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "🗂️ 메인 화면 및 일정 편집", "📥 학생 제출 자료 조회 및 관리", "💾 DB 백업 및 복구", "🛡️ 자동 백업 센터"])
             else: 
                 tab_home, tab_user, tab_view = st.tabs(["📌 캠프 공지(미리보기)", "👥 회원 관리", "📥 학생 제출 자료 조회 및 관리"])
             
@@ -1213,6 +1210,50 @@ else:
                         st.session_state.msg_user_appr = False
                         st.session_state.msg_user_appr_all = False
                 else: st.info("가입 승인을 대기 중인 회원이 없습니다.")
+
+                st.markdown("---")
+                st.subheader("🧑‍🏫 반별 학생 승인 (일괄/개별)")
+                st.info("💡 승인 대기 중인 학생을 반별로 분류하여, 반 단위로 한 번에 승인하거나 학생을 골라 개별 승인할 수 있습니다.")
+                if st.session_state.get("msg_class_appr"):
+                    show_success_message("🎉 반별 승인이 완료되었습니다!", "선택하신 학생들의 가입 승인이 성공적으로 처리되었습니다.")
+                    st.session_state.msg_class_appr = False
+                class_pending = {k: v for k, v in hub_users.items() if v.get("role") == "학생" and not v.get("approved", True)}
+                if not class_pending:
+                    st.success("현재 승인 대기 중인 학생이 없습니다.")
+                else:
+                    groups_map = {}
+                    for _uid, _info in class_pending.items():
+                        _cg = _info.get("class_group") or "미배정"
+                        groups_map.setdefault(_cg, []).append(_uid)
+                    ordered_groups = [g for g in CLASS_GROUPS if g in groups_map] + [g for g in groups_map if g not in CLASS_GROUPS]
+                    st.write(f"총 **{len(class_pending)}명**의 학생이 승인을 기다리고 있습니다. (반별 대기 인원은 아래 각 반을 펼쳐 확인하세요.)")
+                    for cg in ordered_groups:
+                        members = sorted(groups_map[cg], key=lambda u: hub_users[u].get("name", ""))
+                        with st.expander(f"📚 {cg}  ·  승인 대기 {len(members)}명", expanded=True):
+                            if st.button(f"✅ {cg} 전체({len(members)}명) 일괄 승인", key=f"appr_class_all_{cg}", type="primary", use_container_width=True):
+                                with db_lock:
+                                    fresh_users = load_json(USERS_FILE, {})
+                                    for uid in members:
+                                        if uid in fresh_users:
+                                            fresh_users[uid]["approved"] = True
+                                    save_json(USERS_FILE, fresh_users)
+                                st.session_state.msg_class_appr = True
+                                st.rerun()
+                            st.markdown("**개별 승인** — 승인할 학생만 아래에서 선택한 뒤 [선택한 학생 승인]을 누르세요.")
+                            sel_members = st.multiselect(
+                                f"{cg} 개별 승인 대상 선택",
+                                members,
+                                format_func=lambda u: f"{hub_users[u].get('name', '이름없음')} ({hub_users[u].get('school', '소속없음')} / {hub_users[u].get('id', u.split('_')[-1])})",
+                                key=f"appr_class_sel_{cg}")
+                            if st.button("선택한 학생 승인", key=f"appr_class_sel_btn_{cg}", disabled=(len(sel_members) == 0)):
+                                with db_lock:
+                                    fresh_users = load_json(USERS_FILE, {})
+                                    for uid in sel_members:
+                                        if uid in fresh_users:
+                                            fresh_users[uid]["approved"] = True
+                                    save_json(USERS_FILE, fresh_users)
+                                st.session_state.msg_class_appr = True
+                                st.rerun()
 
                 st.markdown("---")
                 st.subheader("✅ 기존 승인된 회원 목록 및 관리")
@@ -1287,7 +1328,7 @@ else:
                                     fresh_users = load_json(USERS_FILE, {})
                                     if delete_target in fresh_users:
                                         del fresh_users[delete_target]
-                                        save_json(USERS_FILE, fresh_users)
+                                        save_json(USERS_FILE, fresh_users, allow_delete=True)
                                 st.session_state.msg_user_del = True
                                 st.rerun()
                                 
@@ -1627,7 +1668,7 @@ else:
                                         fresh_config["tabs"].remove(del_tab_target)
                                         fresh_config["pdfs"].pop(del_tab_target, None)
                                         fresh_config["questions"].pop(del_tab_target, None)
-                                        save_json(CONFIG_FILE, fresh_config)
+                                        save_json(CONFIG_FILE, fresh_config, allow_delete=True)
                                 st.session_state.msg_del_tab = True
                                 st.rerun()
                                 
@@ -1705,7 +1746,7 @@ else:
                         if uploaded_learning and st.button("학생 학습 데이터 덮어쓰기", type="primary", key="btn_restore_learning"):
                             try:
                                 loaded_data = json.load(uploaded_learning)
-                                with db_lock: save_json(DATA_FILE, loaded_data)
+                                with db_lock: save_json(DATA_FILE, loaded_data, allow_delete=True)
                                 st.session_state.msg_restore_learning = True
                                 st.rerun()
                             except Exception:
@@ -1720,7 +1761,7 @@ else:
                         if uploaded_users and st.button("회원 정보 데이터 덮어쓰기", type="primary", key="btn_restore_users"):
                             try:
                                 loaded_users = json.load(uploaded_users)
-                                with db_lock: save_json(USERS_FILE, loaded_users)
+                                with db_lock: save_json(USERS_FILE, loaded_users, allow_delete=True)
                                 st.session_state.msg_restore_users = True
                                 st.rerun()
                             except Exception:
@@ -1735,7 +1776,7 @@ else:
                         if uploaded_config and st.button("시스템 설정 데이터 덮어쓰기", type="primary", key="btn_restore_config"):
                             try:
                                 loaded_config = json.load(uploaded_config)
-                                with db_lock: save_json(CONFIG_FILE, loaded_config)
+                                with db_lock: save_json(CONFIG_FILE, loaded_config, allow_delete=True)
                                 st.session_state.msg_restore_config = True
                                 st.rerun()
                             except Exception:
@@ -1743,6 +1784,9 @@ else:
                         if st.session_state.get("msg_restore_config"):
                             show_success_message("🎉 시스템 설정 복구 완료!", "캠프 일정 및 링크 설정 등이 과거 상태로 복구되었습니다.")
                             st.session_state.msg_restore_config = False
+
+                with tab_backup:
+                    cs.render_backup_ui(CONFIG_FILE)
 
             with tab_view:
                 col_title, col_btn = st.columns([8, 2])
