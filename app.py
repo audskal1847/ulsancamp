@@ -53,57 +53,7 @@ ACTIVITIES = [
 
 INFO_BOX = "<div style='background-color: #f0f4f8; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: 700; color: #111; margin-bottom: 15px; border-left: 5px solid #0056b3; line-height: 1.5;'>{}</div>"
 
-# ==============================================================
-# [핵심 수정 1] 데이터 유실 방지를 위한 파일 Lock 및 병합(Merge) 로직 적용
-# ==============================================================
 db_lock = threading.Lock()
-
-def deep_merge(dict1, dict2):
-    """딕셔너리 병합 시 기존 데이터를 덮어쓰지 않고 내부 키까지 완벽히 합쳐줍니다."""
-    merged = dict1.copy()
-    for k, v in dict2.items():
-        if k in merged and isinstance(merged[k], dict) and isinstance(v, dict):
-            merged[k] = deep_merge(merged[k], v)
-        else:
-            merged[k] = v
-    return merged
-
-def load_json(file_path, default_value):
-    if not os.path.exists(file_path):
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(default_value, f, ensure_ascii=False, indent=4)
-        return default_value
-    for _ in range(5):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f: 
-                return json.load(f)
-        except json.JSONDecodeError:
-            time.sleep(0.1)
-    return default_value
-
-def save_json(file_path, data, allow_delete=False):
-    """저장 시 기존 디스크 데이터를 다시 읽어 병합합니다. (데이터 유실 원천 차단)"""
-    with db_lock:
-        # 1) 현재 디스크에 있는 최신 데이터를 읽어옵니다.
-        current_data = {}
-        if os.path.exists(file_path):
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    current_data = json.load(f)
-            except:
-                pass
-        
-        # 2) 삭제가 허용된 경우(강제 탈퇴 등)가 아니면 무조건 병합(Merge)합니다.
-        if not allow_delete and isinstance(current_data, dict) and isinstance(data, dict):
-            data_to_save = deep_merge(current_data, data)
-        else:
-            data_to_save = data
-            
-        # 3) 안전하게 임시 파일에 먼저 쓰고 원본을 교체합니다. (원자적 쓰기)
-        tmp_path = file_path + ".tmp"
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            json.dump(data_to_save, f, ensure_ascii=False, indent=4)
-        os.replace(tmp_path, file_path)
 
 def show_success_message(title="🎉 화면 저장이 완료되었습니다!", desc="입력하신 내용이 데이터베이스에 안전하게 저장되었습니다."):
     st.balloons()
@@ -124,6 +74,23 @@ def decode_token(token):
         return decoded.split("|")
     except:
         return None, None
+
+def load_json(file_path, default_value):
+    if not os.path.exists(file_path):
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(default_value, f, ensure_ascii=False, indent=4)
+        return default_value
+    for _ in range(5):
+        try:
+            with open(file_path, "r", encoding="utf-8") as f: 
+                return json.load(f)
+        except json.JSONDecodeError:
+            time.sleep(0.1)
+    return default_value
+
+def save_json(file_path, data):
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
 def init_system():
     with db_lock:
@@ -368,7 +335,7 @@ def render_pdf_link(label, html_content):
         
         var printWindow = window.open(blobUrl, '_blank');
         if (!printWindow) {{
-            alert('팝업 차단이 설정되어 있을 수 있습니다. 브라우저 주소창 우측에서 팝업 차단을 해제해 주세요.');
+            alert('팝업 차단이 설정되어 있을 수 있습니다. 팝업 차단을 해제해 주세요.');
         }}
     }}
     </script>
@@ -1215,57 +1182,37 @@ else:
                 approved_users = {k: v for k, v in hub_users.items() if v.get("approved", True)}
 
                 st.subheader("⏳ 가입 승인 대기 목록")
-                
-                # ==============================================================
-                # [핵심 수정 2] 가입 승인 대기 목록 반별 필터링 기능 추가
-                # ==============================================================
                 if pending_users:
-                    col_pending_filter1, col_pending_filter2 = st.columns([1, 3])
-                    with col_pending_filter1:
-                        st.markdown("**🔍 반별 조회 필터**")
-                        pending_filter_class = st.radio("조회할 반 선택", ["전체 대기자 보기"] + CLASS_GROUPS, horizontal=False)
-                    
-                    with col_pending_filter2:
-                        filtered_pending_users = {
-                            k: v for k, v in pending_users.items() 
-                            if pending_filter_class == "전체 대기자 보기" or v.get("class_group") == pending_filter_class
-                        }
-                        
-                        if filtered_pending_users:
-                            df_pending = pd.DataFrame([{"학교": info.get("school", "-"), "학번/ID": info.get("id", k.split('_')[-1]), "이름": info.get("name", "이름없음"), "권한": info.get("role", "-"), "반": info.get("class_group", "-")} for k, info in filtered_pending_users.items()])
-                            st.dataframe(df_pending, use_container_width=True)
-                            
-                            col_app1, col_app2 = st.columns(2)
-                            with col_app1:
-                                approve_target = st.selectbox("승인할 회원을 선택하세요", ["선택"] + list(filtered_pending_users.keys()), format_func=lambda x: x if x == "선택" else f"[{filtered_pending_users[x].get('school', '소속없음')}] {filtered_pending_users[x].get('name', '이름없음')} ({filtered_pending_users[x].get('id', x.split('_')[-1])})")
-                                if approve_target != "선택":
-                                    if st.button("✅ 선택한 회원 가입 승인", type="primary"):
-                                        with db_lock:
-                                            fresh_users = load_json(USERS_FILE, {})
-                                            if approve_target in fresh_users:
-                                                fresh_users[approve_target]["approved"] = True
-                                                save_json(USERS_FILE, fresh_users)
-                                        st.session_state.msg_user_appr = True
-                                        st.rerun()
-                            with col_app2:
-                                if st.button(f"✅ 현재 표시된 [{pending_filter_class}] 대기자 일괄 승인", type="primary"):
-                                    with db_lock:
-                                        fresh_users = load_json(USERS_FILE, {})
-                                        for uid in filtered_pending_users.keys(): 
-                                            if uid in fresh_users:
-                                                fresh_users[uid]["approved"] = True
+                    df_pending = pd.DataFrame([{"학교": info.get("school", "-"), "학번/ID": info.get("id", k.split('_')[-1]), "이름": info.get("name", "이름없음"), "권한": info.get("role", "-"), "반": info.get("class_group", "-")} for k, info in pending_users.items()])
+                    st.dataframe(df_pending, use_container_width=True)
+                    col_app1, col_app2 = st.columns(2)
+                    with col_app1:
+                        approve_target = st.selectbox("승인할 회원을 선택하세요", ["선택"] + list(pending_users.keys()), format_func=lambda x: x if x == "선택" else f"[{pending_users[x].get('school', '소속없음')}] {pending_users[x].get('name', '이름없음')} ({pending_users[x].get('id', x.split('_')[-1])})")
+                        if approve_target != "선택":
+                            if st.button("✅ 선택한 회원 가입 승인", type="primary"):
+                                with db_lock:
+                                    fresh_users = load_json(USERS_FILE, {})
+                                    if approve_target in fresh_users:
+                                        fresh_users[approve_target]["approved"] = True
                                         save_json(USERS_FILE, fresh_users)
-                                    st.session_state.msg_user_appr_all = True
-                                    st.rerun()
-                        else:
-                            st.info(f"현재 선택하신 '{pending_filter_class}'에 가입 승인을 대기 중인 회원이 없습니다.")
+                                st.session_state.msg_user_appr = True
+                                st.rerun()
+                    with col_app2:
+                        if st.button("✅ 대기 중인 모든 회원 일괄 승인", type="primary"):
+                            with db_lock:
+                                fresh_users = load_json(USERS_FILE, {})
+                                for uid in pending_users.keys(): 
+                                    if uid in fresh_users:
+                                        fresh_users[uid]["approved"] = True
+                                save_json(USERS_FILE, fresh_users)
+                            st.session_state.msg_user_appr_all = True
+                            st.rerun()
                             
                     if st.session_state.get("msg_user_appr") or st.session_state.get("msg_user_appr_all"):
                         show_success_message("🎉 승인이 완료되었습니다!", "가입 승인이 성공적으로 처리되었습니다.")
                         st.session_state.msg_user_appr = False
                         st.session_state.msg_user_appr_all = False
-                else: 
-                    st.info("가입 승인을 대기 중인 회원이 전체 거점에 없습니다.")
+                else: st.info("가입 승인을 대기 중인 회원이 없습니다.")
 
                 st.markdown("---")
                 st.subheader("✅ 기존 승인된 회원 목록 및 관리")
@@ -1284,19 +1231,14 @@ else:
                     
                     if editable_students:
                         search_ed = st.text_input("🔍 수정할 학생 검색 (이름, 학교, 학번 입력)", key="search_ed")
-                        selected_ed_idx = 0
                         if search_ed:
                             search_term = search_ed.replace(" ", "")
                             filtered_ed = [u for u in editable_students if search_term in all_users[u].get('name', '').replace(" ", "") or search_term in all_users[u].get('school', '').replace(" ", "") or search_term in all_users[u].get('id', '').replace(" ", "")]
-                            if filtered_ed:
-                                options_ed = filtered_ed
-                                selected_ed_idx = 0
-                            else:
-                                options_ed = ["검색 결과 없음"]
+                            options_ed = filtered_ed if filtered_ed else ["검색 결과 없음"]
                         else:
                             options_ed = ["선택"] + editable_students
 
-                        edit_target = st.selectbox("정보를 수정할 학생을 선택하세요", options_ed, index=selected_ed_idx, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('school', '소속없음')})")
+                        edit_target = st.selectbox("정보를 수정할 학생을 선택하세요", options_ed, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('class_group', '-')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('school', '소속없음')})")
                         
                         if edit_target not in ["선택", "검색 결과 없음"]:
                             target_info = all_users[edit_target]
@@ -1331,45 +1273,35 @@ else:
                     with col1:
                         st.write("❌ **회원 강제 탈퇴(삭제)**")
                         search_del = st.text_input("🔍 삭제할 회원 검색", key="search_del")
-                        selected_del_idx = 0
                         if search_del:
                             search_term_del = search_del.replace(" ", "")
                             filtered_del = [u for u in editable_users if search_term_del in all_users[u].get('name', '').replace(" ", "") or search_term_del in all_users[u].get('school', '').replace(" ", "") or search_term_del in all_users[u].get('id', '').replace(" ", "")]
-                            if filtered_del:
-                                options_del = filtered_del
-                                selected_del_idx = 0
-                            else:
-                                options_del = ["검색 결과 없음"]
+                            options_del = filtered_del if filtered_del else ["검색 결과 없음"]
                         else:
                             options_del = ["선택"] + editable_users
 
-                        delete_target = st.selectbox("삭제할 회원을 선택하세요", options_del, index=selected_del_idx, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
+                        delete_target = st.selectbox("삭제할 회원을 선택하세요", options_del, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         if delete_target not in ["선택", "검색 결과 없음"]:
                             if st.button(f"⚠️ {all_users[delete_target].get('name', '해당 사용자')} 회원 데이터 영구 삭제", type="primary"):
                                 with db_lock:
                                     fresh_users = load_json(USERS_FILE, {})
                                     if delete_target in fresh_users:
                                         del fresh_users[delete_target]
-                                        save_json(USERS_FILE, fresh_users, allow_delete=True)
+                                        save_json(USERS_FILE, fresh_users)
                                 st.session_state.msg_user_del = True
                                 st.rerun()
                                 
                     with col2:
                         st.write("🔑 **학생/교사 비밀번호 강제 변경**")
                         search_pw = st.text_input("🔍 비밀번호 변경할 회원 검색", key="search_pw")
-                        selected_pw_idx = 0
                         if search_pw:
                             search_term_pw = search_pw.replace(" ", "")
                             filtered_pw = [u for u in editable_users if search_term_pw in all_users[u].get('name', '').replace(" ", "") or search_term_pw in all_users[u].get('school', '').replace(" ", "") or search_term_pw in all_users[u].get('id', '').replace(" ", "")]
-                            if filtered_pw:
-                                options_pw = filtered_pw
-                                selected_pw_idx = 0
-                            else:
-                                options_pw = ["검색 결과 없음"]
+                            options_pw = filtered_pw if filtered_pw else ["검색 결과 없음"]
                         else:
                             options_pw = ["선택"] + editable_users
 
-                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", options_pw, index=selected_pw_idx, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
+                        pw_target = st.selectbox("비밀번호를 변경할 회원을 선택하세요", options_pw, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('school', '소속없음')}] {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         new_pw = st.text_input("새로운 비밀번호 입력", type="password")
                         if pw_target not in ["선택", "검색 결과 없음"]:
                             if st.button("비밀번호 변경 적용", type="primary") and new_pw:
@@ -1695,7 +1627,7 @@ else:
                                         fresh_config["tabs"].remove(del_tab_target)
                                         fresh_config["pdfs"].pop(del_tab_target, None)
                                         fresh_config["questions"].pop(del_tab_target, None)
-                                        save_json(CONFIG_FILE, fresh_config, allow_delete=True)
+                                        save_json(CONFIG_FILE, fresh_config)
                                 st.session_state.msg_del_tab = True
                                 st.rerun()
                                 
@@ -1773,7 +1705,7 @@ else:
                         if uploaded_learning and st.button("학생 학습 데이터 덮어쓰기", type="primary", key="btn_restore_learning"):
                             try:
                                 loaded_data = json.load(uploaded_learning)
-                                with db_lock: save_json(DATA_FILE, loaded_data, allow_delete=True)
+                                with db_lock: save_json(DATA_FILE, loaded_data)
                                 st.session_state.msg_restore_learning = True
                                 st.rerun()
                             except Exception:
@@ -1788,7 +1720,7 @@ else:
                         if uploaded_users and st.button("회원 정보 데이터 덮어쓰기", type="primary", key="btn_restore_users"):
                             try:
                                 loaded_users = json.load(uploaded_users)
-                                with db_lock: save_json(USERS_FILE, loaded_users, allow_delete=True)
+                                with db_lock: save_json(USERS_FILE, loaded_users)
                                 st.session_state.msg_restore_users = True
                                 st.rerun()
                             except Exception:
@@ -1803,7 +1735,7 @@ else:
                         if uploaded_config and st.button("시스템 설정 데이터 덮어쓰기", type="primary", key="btn_restore_config"):
                             try:
                                 loaded_config = json.load(uploaded_config)
-                                with db_lock: save_json(CONFIG_FILE, loaded_config, allow_delete=True)
+                                with db_lock: save_json(CONFIG_FILE, loaded_config)
                                 st.session_state.msg_restore_config = True
                                 st.rerun()
                             except Exception:
@@ -1870,20 +1802,16 @@ else:
                         st.markdown("---")
                         st.subheader("👤 특정 학생 개별 조회 및 다운로드")
                         
+                        # [최종 수정] 회원 검색 자동 선택 적용
                         search_view = st.text_input("🔍 조회할 학생 검색 (이름, 학교, 학번 입력)", key="search_view")
-                        selected_view_idx = 0
                         if search_view:
                             search_term_view = search_view.replace(" ", "")
                             filtered_view = [u for u in student_list if search_term_view in all_users[u].get('name', '').replace(" ", "") or search_term_view in all_users[u].get('school', '').replace(" ", "") or search_term_view in all_users[u].get('id', '').replace(" ", "")]
-                            if filtered_view:
-                                options_view = filtered_view
-                                selected_view_idx = 0
-                            else:
-                                options_view = ["검색 결과 없음"]
+                            options_view = filtered_view if filtered_view else ["검색 결과 없음"]
                         else:
                             options_view = ["선택"] + student_list
                         
-                        selected_student = st.selectbox("학생 선택", options_view, index=selected_view_idx, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('hub_school', '')}] [{all_users[x].get('class_group', '-')}] {all_users[x].get('school', '-')} {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
+                        selected_student = st.selectbox("학생 선택", options_view, format_func=lambda x: x if x in ["선택", "검색 결과 없음"] else f"[{all_users[x].get('hub_school', '')}] [{all_users[x].get('class_group', '-')}] {all_users[x].get('school', '-')} {all_users[x].get('name', '이름없음')} ({all_users[x].get('id', x.split('_')[-1])})")
                         
                         if selected_student not in ["선택", "검색 결과 없음"]:
                             student_answers = learning_data.get(selected_student, {})
